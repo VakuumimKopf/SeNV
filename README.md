@@ -1,5 +1,9 @@
 # SeNV
 
+Allgemiene Hinweise:
+- Kommentare/ Variablen/ klassen etc. im code in englisch, kleingeschrieben, mit Unterstrich verbinden
+- Issue/ Pull Request/ Commits etc. deutsch mit engl. Bezug zum Code
+
 
 Hinweis zu Projects:
 Bei Zuweisung einer Aufgabe:
