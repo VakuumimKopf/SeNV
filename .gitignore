@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 devel/
 logs/
 build/
@@ -49,3 +50,32 @@ qtcreator-*
 
 # Catkin custom files
 CATKIN_IGNORE
+=======
+/build/
+/install/
+/log/
+CMakeFiles/
+CMakeCache.txt
+Makefile
+*.cmake
+*.swp
+
+# Editor-spezifische Dateien (z.B. für Vim, Emacs, etc.)
+*.swo
+*.swp
+
+# Python-Bytecode-Dateien
+*.pyc
+*.pyo
+
+# Cache-Dateien
+*.cache
+#Packages und Builds die ich nicht in diesem Repo brauche
+/src/ros_tutorials
+/src/timing_tubaf_cpp
+/src/follower_rob
+/src/build/
+/src/install/
+/src/log/
+
+>>>>>>> c570f8f (erster commit)
