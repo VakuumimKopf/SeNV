@@ -10,6 +10,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/launch', ['launch/launch_senv.py'])
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -20,6 +21,10 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'lane_con = senv.lane_con:main',
+            'intersection_con = senv.intersection_con:main',
+            'park_con = senv.park_con:main',
+            'driving = senv.driving:main',
         ],
     },
 )
