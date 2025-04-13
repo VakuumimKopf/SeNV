@@ -24,7 +24,9 @@ setup(
             'lane_con = senv.lane_con:main',
             'intersection_con = senv.intersection_con:main',
             'park_con = senv.park_con:main',
-            'driving = senv.driving:main',
+            'driver = senv.driver:main',
+            'laserscanner = senv.laserscanner:main',
+            
         ],
     },
 )

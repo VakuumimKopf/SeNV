@@ -16,7 +16,7 @@ def generate_launch_description():
         ),
         Node(
             package='senv',
-            executable='intersection_con.py',
+            executable='laserscanner',
 
             # activate output
             output='screen',
@@ -29,23 +29,7 @@ def generate_launch_description():
         ),
         Node(
             package='senv',
-            executable='lane_con.py',
-            # activate output
-            output='screen',
-            emulate_tty=True,
-            arguments=[('__log_level:=debug')],
-        ),
-        Node(
-            package='senv',
-            executable='park_con.py',
-            # activate output
-            output='screen',
-            emulate_tty=True,
-            arguments=[('__log_level:=debug')],
-        ),
-        Node(
-            package='senv',
-            executable='driving.py',
+            executable='lane_con',
             # activate output
             output='screen',
             emulate_tty=True,
