@@ -1,5 +1,4 @@
 import rclpy
-import rclpy.executors
 import rclpy.node
 import cv2
 import numpy as np
@@ -53,7 +52,6 @@ class laserscanner(rclpy.node.Node):
     # driving logics
     def timer_callback(self):
         self.get_logger().info("laserscannercallback")
-        #print('Weinender Emoji')
         if ((self.front_distance <= 0.2) & (self.front_distance != 0.0 )) :
             msg = Int16()
             msg.data = 0

@@ -1,5 +1,4 @@
-import rclpy
-import rclpy.executors
+import rclpy 
 import rclpy.node
 import cv2
 import numpy as np
@@ -8,7 +7,7 @@ from geometry_msgs.msg import Twist
 from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge, CvBridgeError
 
-class LineFollow(rclpy.node.Node):
+class lane_con(rclpy.node.Node):
 
     def __init__(self):
         super().__init__('follower')
@@ -35,7 +34,7 @@ class LineFollow(rclpy.node.Node):
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST,
                                           depth=1)
         
-        self.last_spin = False # False == gegen UHrzeigersinn True==mit Uhrzeigersinn
+        self.last_spin = False # False == gegen Uhrzeigersinn True==mit Uhrzeigersinn
         # create subscribers for image data with changed qos
         self.subscription = self.create_subscription(
             CompressedImage,
@@ -45,7 +44,7 @@ class LineFollow(rclpy.node.Node):
         self.subscription  # prevent unused variable warning
 
         # create publisher for driving commands
-        self.publisher_linefollow = self.create_publisher(Twist, 'line', 1)
+        self.publisher_lane_con = self.create_publisher(Twist, 'line', 1)
 
         # create timer to periodically invoke the driving logic
         self.timer_period = 0.1  # seconds
@@ -72,7 +71,7 @@ class LineFollow(rclpy.node.Node):
         cv2.waitKey(1)
 
 
-    # driving logic for linefollowing
+    # driving logic for lane_coning
     def timer_callback(self):
         #self.get_logger().info("FollowerLogic")
         
@@ -101,15 +100,12 @@ class LineFollow(rclpy.node.Node):
         middle_index_in_original = img_row_sorted[middle_index_in_subset]
 
         max_avg = np.mean(img_row_sorted)
-        #closest_index = img_row[np.argmin(np.abs(img_row_sorted - max_avg))]
-        #closest_index = np.argmin(np.abs(np.arange(len(img_row)) - max_avg))
         closest_value = img_row[middle_index_in_original]
         #middle_pix = 320 # für 640px x irgendwas
         middle_pix = 550 # für 320px
         speed = 0.0
         turn = 0.0
         brightest = max(img_row)
-        #bright_pos = np.where(img_row == closest_value)[0][0]
         line_pos = middle_index_in_original + boundary_left
 
         #self.get_logger().info(f"Hellster Wert: {brightest}")
@@ -154,21 +150,21 @@ class LineFollow(rclpy.node.Node):
         msg.angular.z = turn
             # send message
         #self.get_logger().info('Line publisher')
-        self.publisher_linefollow.publish(msg)
+        self.publisher_lane_con.publish(msg)
 
 def main(args=None):
     rclpy.init(args=args)
-    node = LineFollow()
+    node = lane_con()
 
     try:
         rclpy.spin(node)
         
     except KeyboardInterrupt:
-        print('Except in Linefollow')
+        print('Except in lane_con')
 
     finally:
         node.destroy_node()
-        print('Shutting Down LineFollow')
+        print('Shutting Down lane_con')
 
 if __name__ == '__main__':
     main()
