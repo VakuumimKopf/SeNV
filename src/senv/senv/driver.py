@@ -5,6 +5,7 @@ from std_msgs.msg import Int16
 from senv.stopper import Stopper
 from geometry_msgs.msg import Twist
 from enum import Enum
+from std_msgs.msg import String
 
 class State(Enum):
     FollowLine = 1
@@ -19,6 +20,7 @@ class Driver(rclpy.node.Node):
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST,
                                           depth=1)
         self.stateint = 1 # 1 is for Follow 2 is for Turn 3 is Error
+        self.previous_state = None
         self.line_msg = Twist()
         self.laser_msg = 1
 
@@ -28,6 +30,7 @@ class Driver(rclpy.node.Node):
         self.subscription_line = self.create_subscription(Twist, 'line', self.line_callback, qos_profile=qos_policy)
 
         self.publisher_ = self.create_publisher(Twist, 'cmd_vel', 1)
+        self.publisher_state= self.create_publisher(String, 'state_info', 1)
 
         timer_period = 0.05
         self.my_timer = self.create_timer(timer_period, self.timer_callback )
@@ -50,22 +53,32 @@ class Driver(rclpy.node.Node):
         self.line_msg = msg
 
     def timer_callback(self):
-        #self.get_logger().info("DriverLogic")
-        if(self.stateint == 1):
-            #self.get_logger().info("using LineMsg")
-            msg = self.line_msg
-        elif(self.stateint == 2):
-            #self.get_logger().info("using LaserMsg")
-            msg = Twist()
-            msg.linear.x = 0.0
-            msg.angular.z = 0.0	
-        else:
-            self.get_logger().info('Error State entered in Driving Logic')
-            msg = Twist()
-            msg.linear.x = 0.0
-            msg.angular.z = 0.0
-        self.get_logger().info(f'Speed: {msg.linear.x} Turn: {msg.angular.z}')
-        self.publisher_.publish(msg)
+        if self.stateint != self.previous_state:
+            state_msg = String()
+            #self.get_logger().info("DriverLogic")
+            if(self.stateint == 1):
+                #self.get_logger().info("using LineMsg")
+                msg = self.line_msg
+                state_msg.data = "Driving"
+                
+            elif(self.stateint == 2):
+                #self.get_logger().info("using LaserMsg")
+                msg = Twist()
+                msg.linear.x = 0.0
+                msg.angular.z = 0.0	
+                state_msg.data = "stop"
+
+            else:
+                self.get_logger().info('Error State entered in Driving Logic')
+                msg = Twist()
+                msg.linear.x = 0.0
+                msg.angular.z = 0.0
+                state_msg.data = "Error"
+            self.get_logger().info(f'Speed: {msg.linear.x} Turn: {msg.angular.z}')
+            self.publisher_.publish(msg)
+            self.publisher_state.publish(state_msg)
+            self.previous_state = self.stateint
+        
 
 def main(args=None):
 
