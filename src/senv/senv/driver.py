@@ -53,7 +53,7 @@ class Driver(rclpy.node.Node):
         self.line_msg = msg
 
     def timer_callback(self):
-        if self.stateint != self.previous_state:
+        
             state_msg = String()
             #self.get_logger().info("DriverLogic")
             if(self.stateint == 1):
@@ -66,7 +66,7 @@ class Driver(rclpy.node.Node):
                 msg = Twist()
                 msg.linear.x = 0.0
                 msg.angular.z = 0.0	
-                state_msg.data = "stop"
+                state_msg.data = "Stop"
 
             else:
                 self.get_logger().info('Error State entered in Driving Logic')
@@ -74,9 +74,10 @@ class Driver(rclpy.node.Node):
                 msg.linear.x = 0.0
                 msg.angular.z = 0.0
                 state_msg.data = "Error"
+            if self.stateint != self.previous_state:
+                self.publisher_state.publish(state_msg)
             self.get_logger().info(f'Speed: {msg.linear.x} Turn: {msg.angular.z}')
             self.publisher_.publish(msg)
-            self.publisher_state.publish(state_msg)
             self.previous_state = self.stateint
         
 

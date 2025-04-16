@@ -35,4 +35,12 @@ def generate_launch_description():
             emulate_tty=True,
             arguments=[('__log_level:=debug')],
         ),
+        Node(
+            package='senv',
+            executable='camera',
+            # activate output
+            output='screen',
+            emulate_tty=True,
+            arguments=[('__log_level:=debug')],
+        ),
     ])
