@@ -59,7 +59,7 @@ class Driver(rclpy.node.Node):
             if(self.stateint == 1):
                 #self.get_logger().info("using LineMsg")
                 msg = self.line_msg
-                state_msg.data = "Driving"
+                state_msg.data = "Drive"
                 
             elif(self.stateint == 2):
                 #self.get_logger().info("using LaserMsg")
