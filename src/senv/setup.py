@@ -1,4 +1,6 @@
 from setuptools import find_packages, setup
+from glob import glob
+import os
 
 package_name = 'senv'
 
@@ -10,7 +12,9 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/launch', ['launch/launch_senv.py'])
+        #('share/' + package_name + '/launch', glob('launch/obstacle_stop_launch.py'))
+         # Add launch files
+        (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -24,7 +28,9 @@ setup(
             'lane_con = senv.lane_con:main',
             'intersection_con = senv.intersection_con:main',
             'park_con = senv.park_con:main',
-            'driving = senv.driving:main',
+            'driver = senv.driver:main',
+            'laserscanner = senv.laserscanner:main',
+            'camera = senv.camera:main',
         ],
     },
 )
