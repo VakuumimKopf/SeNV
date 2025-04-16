@@ -1,4 +1,4 @@
-# SeNV
+# SeNV (Situationsevaluierendes Navigations Vehicle)
 
 Allgemiene Hinweise:
 
