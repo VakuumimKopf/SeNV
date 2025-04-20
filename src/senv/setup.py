@@ -26,6 +26,7 @@ setup(
             'park_con = senv.park_con:main',
             'driving = senv.driving:main',
             'camera = senv.camera:main',
+            'laserscanner = senv.laserscanner:main',
         ],
     },
 )
