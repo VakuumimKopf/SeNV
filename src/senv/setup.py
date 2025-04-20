@@ -25,6 +25,7 @@ setup(
             'intersection_con = senv.intersection_con:main',
             'park_con = senv.park_con:main',
             'driving = senv.driving:main',
+            'camera = senv.camera:main',
         ],
     },
 )
