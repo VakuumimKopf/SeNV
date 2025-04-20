@@ -10,7 +10,7 @@ class intersection_con(Node):
         self.get_logger().info('intersection_con node has been started.')
 
         # Parameters
-        self.turned_on = True
+        self.turned_on = False
         
         # QOS Policy Setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,

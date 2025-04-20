@@ -1,52 +1,52 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
+from senv_interfaces.msg import Pic,Laser 
 
 
 class park_con(Node):
     def __init__(self):
         super().__init__('park_con')
         self.get_logger().info('park_con node has been started.')
-        # Initialize your node here
 
+        # Parameters
+        self.turned_on = False
+        
+        # QOS Policy Setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST,depth=1)
 
-        self.subscriber = self.create_subscription(
-            any,  # Replace with the actual message type
-            'Parking',
-            self.parking_callback,
+        # Subscribing to camera and laser topics
+        self.subscriber_pic = self.create_subscription(
+            Pic,  # Replace with the actual message type
+            'pic',
+            self.pic_callback,
             qos_profile=qos_policy
         )
-        
-        self.subscriber  # prevent unused variable warning
+        self.subscriber_pic  # prevent unused variable warning
 
-        self.publisher = self.create_publisher(
-            Twist,  
-            'driving',
+        self.subscriber_laser = self.create_subscription(
+            Laser,  # Replace with the actual message type
+            'laser',
+            self.laser_callback,
             qos_profile=qos_policy
         )
-        self.publisher
+        self.subscriber_laser  # prevent unused variable warning
 
-        self.publisher = self.create_publisher(
-            any,  # Replace with the actual message type
-            'finished',
-            qos_profile=qos_policy
-        )
-        self.publisher
 
-        #timer
-        self.timer = self.create_timer(0.1, self.callback)
-        
-    def parking_callback(self, msg):
+    def pic_callback(self, msg):
+        if self.turned_on == False:
+            return
         # Process the incoming message
-        self.get_logger().info('Received message: %s' % msg.data)
-        # Add where obstacle is     
-    def callback(self):
+        self.get_logger().info('Received message pic')
+        # Add driving logic here
+
+    def laser_callback(self, msg):
+        if self.turned_on == False:
+            return
         # Define your callback function here
-        self.get_logger().info('Executing callback...')
-        # add parking logic based on the obstacle position
-        
+        self.get_logger().info('Received message laser')
+        # obstacle avoidance
 
 
 def main(args=None):
