@@ -1,3 +1,15 @@
 {
-    "cmake.sourceDirectory": "/home/oliver/senv_ws/src/senv_interfaces"
+    "cmake.sourceDirectory": "/home/oliver/senv_ws/src/senv_interfaces",
+    "python.autoComplete.extraPaths": [
+        "/home/oliver/senv_ws/install/senv_interfaces/local/lib/python3.10/dist-packages",
+        "/home/oliver/senv_ws/install/senv/lib/python3.10/site-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/oliver/senv_ws/install/senv_interfaces/local/lib/python3.10/dist-packages",
+        "/home/oliver/senv_ws/install/senv/lib/python3.10/site-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ]
 }
