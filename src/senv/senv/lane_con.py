@@ -11,6 +11,10 @@ class lane_con(Node):
         super().__init__('lane_con')
         self.get_logger().info('lane_con node has been started.')
         
+        self.is_turned_on = True
+        self.park_con_triggers = ["park_sign"]
+        self.intersection_con_triggers = ["intersection_sign_left", "intersection_sign_right", "intersection_sign_straight"]
+
         # Qos policy setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST,depth=1)
@@ -39,14 +43,18 @@ class lane_con(Node):
         )
 
     # Sending request to action server 
-    def send_goal(self, working_status):
-        self.intersection_client_.wait_for_server()
+    def send_goal(self, working_status, client: ActionClient):
 
-        goal = ConTask.Goal()
+        #self.intersection_client_.wait_for_server()
+        client.wait_for_server()
+
+        #goal = ConTask.Goal()
+        goal = client._action_type()
+
         goal.start_working = working_status
         
         self.get_logger().info("sending data to intersection server")
-        self.intersection_client_. \
+        client. \
             send_goal_async(goal). \
                 add_done_callback(self.goal_response_callback)
 
@@ -61,17 +69,43 @@ class lane_con(Node):
         result = future.result().result
         self.get_logger().info("Result:" + str(result.finished))
         
-    def pic_callback(self, msg):
-        # Process the incoming message
+    def pic_callback(self, msg: Pic):
+        # Process the incoming message and decide whats to do --> give this information to sender
         self.get_logger().info('Received message pic')
-        # Add driving logic here
 
-    def laser_callback(self, msg):
-        # Define your callback function here
+        if msg.sign in self.park_con_triggers:
+            #send action to park_con
+            #stop controll 
+            return
+        elif msg.sign in self.intersection_con_triggers:
+            #send action to intersection_con
+            #stop controll
+            return
+        elif msg.line == "red light":
+            #hold on line until green light
+            pass 
+        elif msg.line == "green light":
+            #continue 
+            #if red light mode also continue
+            pass 
+        elif msg.line == "":
+            #do nothing special
+            #lane holding algorithm
+            pass 
+        else:
+            self.get_logger().info("Error in pic_callback string sign: false value")
+
+    def laser_callback(self, msg: Laser):
+        # Process incoming message and decide what to do --> give this information to sender
         self.get_logger().info('Received message laser')
-        # obstacle avoidance
+        if msg.distance <= self.min_obstacle_distance:
+            #tell sender to stop
+            pass 
+        # obstacle avoidance algorithm
 
-
+    def driving_sender(command):
+        # commands: stop, drive_normal, drive_slow, drive_fast
+        pass 
 
 def main(args=None):
     rclpy.init(args=args)
