@@ -17,28 +17,17 @@ class driver(Node):
             self.driving_callback, 
             qos_profile=qos_policy
         )
-        
         self.subscriber  # prevent unused variable warning
 
+        self.publisher = self.create_publisher(Twist, 'cmd_vel', 1)
 
-        #self.publisher = self.create_publisher(Twist, 'cmd_vel', 1)
-
-
-        #timer
-        # self.timer = self.create_timer(0.1, self.callback)
-        
     def driving_callback(self, msg: Twist):
         # Process the incoming message
-        self.get_logger().info("Driver recieved data" + str(msg.linear.x))
-        # define direction based on the sign in msg
-
-    def callback(self):
-        self.get_logger().info('Executing callback...')
-
-        msg = Twist()
-        self.publisher.publish(msg)
+        self.get_logger().info("Driver recieved data: " + str(msg.linear.x) + " : " + str(msg.angular.z))
         
+        # Debuga algorithm here here 
 
+        self.publisher.publish(msg)
 
 def main(args=None):
     rclpy.init(args=args)
