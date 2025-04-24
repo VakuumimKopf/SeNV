@@ -5,6 +5,8 @@ from rclpy.action.server import ServerGoalHandle
 from senv_interfaces.msg import Pic,Laser 
 from senv_interfaces.action import ConTask
 
+import time
+
 
 class intersection_con(Node):
     def __init__(self):
@@ -51,6 +53,7 @@ class intersection_con(Node):
         # Execute action 
         self.turned_on = target
         self.datahandler()
+        self.get_logger().info("Handling intersection complete")
 
         # Final Goal State
         goal_handle.succeed()
@@ -76,6 +79,7 @@ class intersection_con(Node):
 
     def datahandler(self):
         self.get_logger().info("Handling intersection data")
+        time.sleep(100)
 
 
 def main(args=None):

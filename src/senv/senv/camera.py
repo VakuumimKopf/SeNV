@@ -75,33 +75,9 @@ class camera(Node):
     def sign_detection(self):
         self.get_logger().info("sign_detection gestartet")
 
-        if self.hsv == 0:
-            self.status = "unknown"
+        #Function for signs - string for Outputs("")
 
-        else:
-            # Farbgrenzen für rot
-            lower_red1 = np.array([0, 100, 100])
-            upper_red1 = np.array([10, 255, 255])
-            lower_red2 = np.array([160, 100, 100])
-            upper_red2 = np.array([179, 255, 255])
-
-            # Farbgrenzen für grün
-            lower_green = np.array([40, 70, 70])
-            upper_green = np.array([90, 255, 255])
-
-            # Masken erstellen
-            red_mask = cv2.inRange(self.hsv, lower_red1, upper_red1) + cv2.inRange(self.hsv, lower_red2, upper_red2)
-            green_mask = cv2.inRange(self.hsv, lower_green, upper_green)
-
-            red_count = cv2.countNonZero(red_mask)
-            green_count = cv2.countNonZero(green_mask)
-
-            if red_count > green_count and red_count > 200:
-                self.status = "red"
-            elif green_count > red_count and green_count > 200:
-                self.status = "green"
-            else:
-                self.status = "unkown"
+        #Function for trafficlights - string for Output("red light", "green light")
 
 
 def main(args=None):
