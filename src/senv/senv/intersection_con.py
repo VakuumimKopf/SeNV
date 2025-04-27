@@ -1,55 +1,81 @@
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist
+from rclpy.action import ActionServer
+from rclpy.action.server import ServerGoalHandle
+from senv_interfaces.msg import Pic,Laser 
+from senv_interfaces.action import ConTask
 
 
 class intersection_con(Node):
     def __init__(self):
         super().__init__('intersection_con')
         self.get_logger().info('intersection_con node has been started.')
-        
 
+        # Parameters
+        self.turned_on = False
+        
+        # QOS Policy Setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST,depth=1)
 
-        self.subscriber = self.create_subscription(
-            any,  # Replace with the actual message type
-            'crossing_intersection',
-            self.crossing_intersection_callback, 
-
+        # Subscribing to camera and laser topics
+        self.subscriber_pic = self.create_subscription(
+            Pic,  # Replace with the actual message type
+            'pic',
+            self.pic_callback,
             qos_profile=qos_policy
         )
+        self.subscriber_pic  # prevent unused variable warning
+
+        self.subscriber_laser = self.create_subscription(
+            Laser,  # Replace with the actual message type
+            'laser',
+            self.laser_callback,
+            qos_profile=qos_policy
+        )
+        self.subscriber_laser  # prevent unused variable warning
+
+        self.intersection_task_server_ = ActionServer(
+            self,
+            ConTask,
+            "intersection_task",
+            self.execute_callback
+        )
+
+    def execute_callback(self, goal_handle: ServerGoalHandle):
         
-        self.subscriber  # prevent unused variable warning
+        # Get request from goal
+        target = goal_handle.request.start_working
+        self.get_logger().info("starting intersection server")
 
-        self.publisher = self.create_publisher(
-            Twist,  # Replace with the actual message type
-            'driving',
-            qos_profile=qos_policy
-        )
-        self.publishers
+        # Execute action 
+        self.turned_on = target
+        self.datahandler()
 
-        self.publishers = self.create_publisher(
-            any,  # Replace with the actual message type
-            'finished',
-            qos_profile=qos_policy
-        )
-        self.publishers
+        # Final Goal State
+        goal_handle.succeed()
 
-        #timer
-        self.timer = self.create_timer(0.1, self.callback)
-        
-    def crossing_intersection_callback(self, msg):
+        #Result
+        result = ConTask.Result()
+        result.finished = True
+        return result
+
+    def pic_callback(self, msg):
+        if self.turned_on == False:
+            return
         # Process the incoming message
-        self.get_logger().info('Received message: %s' % msg.data)
-        # define direction based on the sign in msg
+        self.get_logger().info('Received message pic')
+        # Add driving logic here
 
-    def callback(self):
+    def laser_callback(self, msg):
+        if self.turned_on == False:
+            return
         # Define your callback function here
-        self.get_logger().info('Executing callback...')
-        # driving logic
+        self.get_logger().info('Received message laser')
+        # obstacle avoidance
 
-        self.publisher.publish(msg)
+    def datahandler(self):
+        self.get_logger().info("Handling intersection data")
 
 
 def main(args=None):
