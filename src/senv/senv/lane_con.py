@@ -101,7 +101,7 @@ class lane_con(Node):
         
         self.get_logger().info('Received message pic')
 
-        turn = self.lane_holding(msg.line)
+        speed,turn = self.lane_holding(msg.line)
 
         if msg.sign in self.park_con_triggers:
             #send action to park_con
@@ -114,17 +114,17 @@ class lane_con(Node):
         elif msg.sign == "red light":
             
             self.get_logger().info("Halten an roter Ampel")
-            self.driving_sender("stop", turn)
+            self.driving_sender("stop",speed, turn)
 
         elif msg.sign == "green light":
 
             self.get_logger().info("Weiterfahren an grüner Ampel") 
-            self.driving_sender("drive_normal", turn)
+            self.driving_sender("drive_normal",speed, turn)
 
         elif msg.sign == "":
             #do nothing special
             #lane holding algorithm
-            self.driving_sender("drive_normal", turn)
+            self.driving_sender("drive_normal",speed, turn)
              
         else:
             self.get_logger().info("Error in pic_callback string sign: false value")
@@ -139,14 +139,13 @@ class lane_con(Node):
 
     # Determine and return turn speed to hold the lane
     def lane_holding(self, data):
-
+        speed_drive = self.get_parameter('speed_drive').get_parameter_value().double_value
+        speed_turn = self.get_parameter('speed_turn').get_parameter_value().double_value
+        last_spin = self.last_spin
+        '''
         # Needed parameters 
         boundary_left = self.get_parameter('boundary_left').get_parameter_value().integer_value
         boundary_right = self.get_parameter('boundary_right').get_parameter_value().integer_value
-        speed_drive = self.get_parameter('speed_drive').get_parameter_value().double_value
-        speed_turn = self.get_parameter('speed_turn').get_parameter_value().double_value
-        light_lim = self.get_parameter('light_lim').get_parameter_value().integer_value
-        last_spin = self.last_spin
 
         # Formating data 
         img_row = data[boundary_left:boundary_right]
@@ -167,7 +166,8 @@ class lane_con(Node):
         brightest = max(img_row)
 
         line_pos = middle_index_in_original + boundary_left
-        
+        '''
+        line_pos = data.line 
         offset = abs(line_pos-middle_pix)
         offset_scaling = 23
 
@@ -175,12 +175,12 @@ class lane_con(Node):
         speed = 0.0
         turn = 0.0
         
-        if(brightest < light_lim  and last_spin == False):        
+        if(line_pos == 0  and last_spin == False):        
             # no white in bottom line of image 
             speed= 0.0
             turn = -speed_turn/2
             #self.get_logger().info('Hallo if1')
-        elif(brightest < light_lim and last_spin == True):
+        elif(line_pos == 0 and last_spin == True):
             speed= 0.0
             turn = speed_turn/2
             #self.get_logger().info('Hallo elif1')
@@ -202,9 +202,9 @@ class lane_con(Node):
                     # bright pixel is in the middle 
                     turn = 0.0
         
-        return turn
+        return speed, turn
 
-    def driving_sender(self, command, turn):
+    def driving_sender(self, command, speed, turn):
         # commands: stop, drive_normal, drive_slow, drive_fast
         msg = Twist()
         if command == "stop":
@@ -214,7 +214,7 @@ class lane_con(Node):
             self.get_logger().info("stop command")
 
         elif command == "drive_normal":
-            msg.linear.x = 0.075
+            msg.linear.x = speed
             msg.angular.z = turn
 
             self.get_logger().info("drive_normal command")
