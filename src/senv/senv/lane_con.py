@@ -1,3 +1,4 @@
+
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
@@ -29,7 +30,7 @@ class lane_con(Node):
         # Qos policy setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST,depth=1)
-
+        self.last_spin = False
         # Subscribing to camera and laser topics
         self.subscriber_pic = self.create_subscription(
             Pic,  # Replace with the actual message type
@@ -231,6 +232,15 @@ def main(args=None):
     node.destroy_node()
     rclpy.shutdown()
 
+    try:
+        rclpy.spin(node)
+        
+    except KeyboardInterrupt:
+        print('Except in lane_con')
+
+    finally:
+        node.destroy_node()
+        print('Shutting Down lane_con')
 
 if __name__ == '__main__':
     main()

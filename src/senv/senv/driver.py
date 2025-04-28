@@ -1,13 +1,21 @@
 import rclpy
-from rclpy.node import Node
+import rclpy.executors
+import rclpy.node
+from std_msgs.msg import Int16
+from senv.stopper import Stopper
 from geometry_msgs.msg import Twist
+from enum import Enum
+from std_msgs.msg import String
 
+class State(Enum):
+    FollowLine = 1
+    TurnOnObject = 2
+    Error = 3
 
-class driver(Node):
+class Driver(rclpy.node.Node):
     def __init__(self):
         super().__init__('driver')
-        self.get_logger().info('driver node has been started.')
-        
+
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST,depth=1)
 
@@ -30,11 +38,23 @@ class driver(Node):
         self.publisher.publish(msg)
 
 def main(args=None):
-    rclpy.init(args=args)
-    node = driver()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+
+    print('Hi from Driver')
+    rclpy.init(args=args, signal_handler_options=rclpy.SignalHandlerOptions.NO)
+    driver_node = Driver()
+    
+    try:
+        rclpy.spin(driver_node)
+
+    except KeyboardInterrupt:
+        driver_node.destroy_node()
+        stop = Stopper()
+
+    finally:
+        driver_node.destroy_node()
+        stop.destroy_node()
+        rclpy.shutdown()
+        print('Shutting Down Driver')
 
 
 if __name__ == '__main__':

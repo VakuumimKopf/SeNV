@@ -9,15 +9,21 @@ from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge, CvBridgeError
+<<<<<<< HEAD
+=======
 from senv_interfaces.msg import Laser
+>>>>>>> c16411254d4dbc1762a597ba784d2dfd2d3f7ad0
 
 class laserscanner(rclpy.node.Node):
     def __init__(self):
         super().__init__('laserturn')
 
+<<<<<<< HEAD
+=======
         self.front_distance = 0.0
         self.is_turning = False
 
+>>>>>>> c16411254d4dbc1762a597ba784d2dfd2d3f7ad0
         # definition of the parameters that can be changed at runtime
         self.declare_parameter('distance_to_turn', 0.45)
         self.declare_parameter('speed_drive', 0.15)
@@ -42,12 +48,23 @@ class laserscanner(rclpy.node.Node):
             self.scanner_callback,
             qos_profile=qos_policy)
         self.subscription  # prevent unused variable warning
+<<<<<<< HEAD
+        self.front_distance = 0.0
+        # create publisher for driving commands
+        self.publisher_laserturn = self.create_publisher(Int16 , 'laser', 1)
+        self.is_turning = False
+        # create timer to periodically invoke the driving logic
+        self.timer_period = 0.5  # seconds
+        self.counter = 0
+        self.turn_time = self.get_parameter('turn_time').get_parameter_value().double_value
+=======
 
         # create publisher for driving commands
         self.publisher_laserturn = self.create_publisher(Laser , 'laser', 1)
 
         # create timer to periodically invoke the driving logic
         self.timer_period = 0.5  # seconds
+>>>>>>> c16411254d4dbc1762a597ba784d2dfd2d3f7ad0
         self.my_timer = self.create_timer(self.timer_period, self.timer_callback)
     
     # handling received laser scan data
@@ -59,10 +76,21 @@ class laserscanner(rclpy.node.Node):
     # driving logics
     def timer_callback(self):
         self.get_logger().info("laserscannercallback")
+<<<<<<< HEAD
+        if ((self.front_distance <= 0.2) & (self.front_distance != 0.0 )) :
+            msg = Int16()
+            msg.data = 0
+        else:
+            msg = Int16()
+            msg.data = 1
+        # send message
+        #self.get_logger().info("Msg", msg)
+=======
         
         msg = Laser()
         msg.distance = self.front_distance
         msg.angle = 0
+>>>>>>> c16411254d4dbc1762a597ba784d2dfd2d3f7ad0
         self.publisher_laserturn.publish(msg)
 
 def main(args=None):
@@ -80,4 +108,8 @@ def main(args=None):
         print('shutting down laserscanner node')
 
 if __name__ == '__main__':
+<<<<<<< HEAD
     main()
+=======
+    main()
+>>>>>>> c16411254d4dbc1762a597ba784d2dfd2d3f7ad0

@@ -5,6 +5,7 @@ from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
+
 from senv_interfaces.msg import Pic
 
 class camera(Node):
@@ -23,6 +24,8 @@ class camera(Node):
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST,
                                           depth=1)
+        
+        self.last_spin = False # False == gegen UHrzeigersinn True==mit Uhrzeigersinn
         
         # create subscribers for image data with changed qos
         self.subscription = self.create_subscription(
@@ -91,6 +94,7 @@ class camera(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = camera()
+
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
@@ -99,4 +103,5 @@ def main(args=None):
         node.destroy_node()
 
 if __name__ == '__main__':
+
     main()
