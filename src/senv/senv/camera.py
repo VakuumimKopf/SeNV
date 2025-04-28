@@ -16,9 +16,9 @@ class camera(Node):
         self.declare_parameter('boundary_right', 630) # 440 für 640px, 220 für 320px
         self.declare_parameter('light_lim', 100)
         self.bridge = CvBridge()
-        self.status = 'unknown'
-        self.hsv = 0
-
+        self.status = ""
+        self.line_pos = 0
+        self.hsv = np.ndarray([])
         #self.img_row = np.array([0, 64, 128, 192, 255], dtype=np.uint8) # Beispiel
         self.img_row = np.random.randint(0, 256, 640, dtype=np.uint8)
 
@@ -60,15 +60,12 @@ class camera(Node):
         img_cv = self.bridge.compressed_imgmsg_to_cv2(data, desired_encoding = 'passthrough')
 
         # convert image to grayscale
+        height, width, _ = img_cv.shape
         img_gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
         img_row = img_gray[height-9,:]
-        # get image size
-        height, width = img_gray.shape[:2]
-        self.img_row = img_row 
 
         # Speichere HSV für farbanalyse in sign detection
 
-        height, width, _ = img_cv.shape
 
         # Bereich: rechtes Drittel, mittleres Drittel vertikal
         x_start = width * 2 // 3
@@ -80,10 +77,9 @@ class camera(Node):
 
         self.hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
 
-        #self.get_logger().info(f"Image Höhe: {width} ")
 
         # Formating data 
-        img_row = data[boundary_left:boundary_right]
+        img_row = img_row[boundary_left:boundary_right]
         
         # 20 greatest items sorted
         img_row_sorted = np.argsort(img_row)[-20:]
@@ -96,63 +92,66 @@ class camera(Node):
 
         # Index des mittleren Wertes im Original-Array
         middle_index_in_original = img_row_sorted[middle_index_in_subset]
-
+        self.line_pos = 0
         # Hellstes Element 
         brightest = max(img_row)
         if brightest > light_lim:
             self.line_pos = middle_index_in_original + boundary_left
         # show image
-        #cv2.imshow("IMG", img_gray)
         #cv2.imshow("IMG_ROW", img_row)
+        #cv2.imshow("IMG", img_cv)
         #cv2.waitKey(1)
     
     # line detection in formated data
     def line_detection(self):
-        self.get_logger().info("line_detection gestartet")
+        #self.get_logger().info("line_detection gestartet")
 
         # Nachricht veröffentlichen
         msg = Pic()
         msg.sign = self.status
         #self.get_logger().info(msg.sign)
-        msg.line = self.line_pos
+        msg.line = int(self.line_pos)
         #self.get_logger().info(msg.line)
 
         self.publisher_.publish(msg)
 
     # sign detection in fomated data
     def sign_detection(self):
-        self.get_logger().info("sign_detection gestartet")
-
+        #self.get_logger().info("sign_detection gestartet")
+        hsv = self.hsv
+        self.status = ""
+        if hsv == []:
+            self.status = ""
+        else:    
         #Function for signs - string for Outputs("")
-        min_area = 50 # Minimale fläche für rotes licht
-        if self.hsv == 0:
-            self.status = "unknown"
-
-        else:
-            # Farbgrenzen für rot
+            min_area = 30 # Minimale fläche für rotes licht
+                # Farbgrenzen für rot
             lower_red1 = np.array([0, 100, 100])
             upper_red1 = np.array([10, 255, 255])
             lower_red2 = np.array([160, 100, 100])
             upper_red2 = np.array([179, 255, 255])
-        hsv = self.hsv
+            self.get_logger().info(f"HSV: {hsv.shape}")
+            mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
+            mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
+            red_mask = cv2.bitwise_or(mask1, mask2)
 
-        mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
-        mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
-        red_mask = cv2.bitwise_or(mask1, mask2)
+            # Optionale Rauschunterdrückung
+            red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+            red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
 
-        # Optionale Rauschunterdrückung
-        red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
-        red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+            # Konturen finden
+            contours, _ = cv2.findContours(red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        # Konturen finden
-        contours, _ = cv2.findContours(red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        # Überprüfen, ob ein Fleck groß genug ist
-        for contour in contours:
-            area = cv2.contourArea(contour)
-            if area > min_area:
-                self.status = 'red light'
+            # Überprüfen, ob ein Fleck groß genug ist
+            for contour in contours:
+                area = cv2.contourArea(contour)
+                if area > min_area:
+                    self.status = 'red light'
+            cv2.imshow("IMG", red_mask)
+            cv2.waitKey(1)
+        
         #Function for trafficlights - string for Output("red light", "green light")
+
 
 
 def main(args=None):

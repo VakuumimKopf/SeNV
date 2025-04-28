@@ -1,2 +1,2 @@
 string sign 
-int32[] line
+int32 line

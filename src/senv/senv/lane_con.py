@@ -21,7 +21,8 @@ class lane_con(Node):
         self.declare_parameter('light_lim', 100)
         self.declare_parameter('middle_tol', 20)
         self.declare_parameter('speed_turn_adjust',0.3)
-        self.lineposition = 0
+        self.min_obstacle_distance = 0.2
+        self.line_pos = 0
         self.last_spin = False # False == gegen Uhrzeigersinn True==mit Uhrzeigersinn
 
         self.is_turned_on = True
@@ -99,7 +100,7 @@ class lane_con(Node):
     def pic_callback(self, msg: Pic):
         # Process the incoming message and decide whats to do --> give this information to sender
         
-        self.get_logger().info('Received message pic')
+        self.get_logger().info('Received message pic: ' + msg.sign)
 
         speed,turn = self.lane_holding(msg.line)
 
@@ -167,11 +168,11 @@ class lane_con(Node):
 
         line_pos = middle_index_in_original + boundary_left
         '''
-        line_pos = data.line 
+        middle_pix = 550 # für 320px
+        line_pos = data
         offset = abs(line_pos-middle_pix)
         offset_scaling = 23
 
-        middle_pix = 550 # für 320px
         speed = 0.0
         turn = 0.0
         
@@ -237,9 +238,9 @@ def main(args=None):
         
     except KeyboardInterrupt:
         print('Except in lane_con')
+        node.destroy_node()
 
     finally:
-        node.destroy_node()
         print('Shutting Down lane_con')
 
 if __name__ == '__main__':
