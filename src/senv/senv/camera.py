@@ -46,27 +46,35 @@ class camera(Node):
     # raw data formating routine 
     def image_callback(self, data):
 
-        try:
-            # Bild von ROS zu OpenCV umwandeln
-            img_cv = self.bridge.compressed_imgmsg_to_cv2(data, desired_encoding='bgr8')
-        except Exception as e:
-            self.get_logger().error(f'Fehler beim Konvertieren: {e}')
-            return
+        # Eingang roh daten werden gefiltert und es wird der ein Int Array 
+        # gespeichert unter self.img_row abgelegt um dann in line_detection gepublisht zu werden  
 
-        # Bild auf kleinere Größe skalieren
-        img_resized = cv2.resize(img_cv, (320, 240))
-        self.hsv = cv2.cvtColor(img_resized, cv2.COLOR_BGR2HSV)
+        img_cv = self.bridge.compressed_imgmsg_to_cv2(data, desired_encoding = 'passthrough')
+
+        # convert image to grayscale
+        img_gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+
+        # get image size
+        height, width = img_gray.shape[:2]
+        #self.get_logger().info(f"Image Höhe: {width} ")
+        # get the lowest row from image
+        img_row = img_gray[height-9,:]
+        self.img_row = img_row 
+
+        # show image
+        #cv2.imshow("IMG", img_gray)
+        #cv2.imshow("IMG_ROW", img_row)
+        #cv2.waitKey(1)
     
     # line detection in formated data
     def line_detection(self):
         self.get_logger().info("line_detection gestartet")
 
-
         # Nachricht veröffentlichen
         msg = Pic()
         msg.sign = self.status
         #self.get_logger().info(msg.sign)
-        msg.line = 0
+        msg.line = self.img_row
         #self.get_logger().info(msg.line)
 
         self.publisher_.publish(msg)

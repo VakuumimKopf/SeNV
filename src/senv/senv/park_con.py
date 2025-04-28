@@ -44,6 +44,9 @@ class park_con(Node):
             self.execute_callback
         )
 
+        
+
+
     def execute_callback(self, goal_handle: ServerGoalHandle):
 
         # Get request from goal
@@ -78,7 +81,7 @@ class park_con(Node):
 
     def datahandler(self):
         self.get_logger().info("Handling park data")
-        
+
 
 def main(args=None):
     rclpy.init(args=args)

@@ -5,6 +5,7 @@ from rclpy.action import ActionClient
 from rclpy.action.client import ClientGoalHandle
 from senv_interfaces.msg import Pic,Laser
 from senv_interfaces.action import ConTask
+import numpy as np
 
 
 class lane_con(Node):
@@ -12,6 +13,16 @@ class lane_con(Node):
         super().__init__('lane_con')
         self.get_logger().info('lane_con node has been started.')
         
+        self.declare_parameter('boundary_left', 100) # 200 für 640px, 100 für 320
+        self.declare_parameter('boundary_right', 630) # 440 für 640px, 220 für 320px
+        self.declare_parameter('speed_drive', 0.115)
+        self.declare_parameter('speed_turn', 0.3)
+        self.declare_parameter('light_lim', 100)
+        self.declare_parameter('middle_tol', 20)
+        self.declare_parameter('speed_turn_adjust',0.3)
+        self.lineposition = 0
+        self.last_spin = False # False == gegen Uhrzeigersinn True==mit Uhrzeigersinn
+
         self.is_turned_on = True
         self.park_con_triggers = ["park_sign"]
         self.intersection_con_triggers = ["intersection_sign_left", "intersection_sign_right", "intersection_sign_straight"]
@@ -36,6 +47,7 @@ class lane_con(Node):
         )
         self.subscriber_laser  # prevent unused variable warning
 
+        # Creating clients for actions 
         self.intersection_client_ = ActionClient(
             self,
             ConTask,
@@ -46,6 +58,12 @@ class lane_con(Node):
             self,
             ConTask,
             "park_task"
+        )
+
+        self.obstacle_client = ActionClient(
+            self,
+            ConTask,
+            "obstacle_task"
         )
 
         self.publisher_ = self.create_publisher(Twist, "driving", 1)
@@ -76,15 +94,13 @@ class lane_con(Node):
     def goal_result_callback(self, future):
         result = future.result().result
         self.get_logger().info("Result:" + str(result.finished))
-
-    def test(self, input):
-        msg = Pic()
-        msg.sign = input
-        self.pic_callback(msg=msg)
         
     def pic_callback(self, msg: Pic):
         # Process the incoming message and decide whats to do --> give this information to sender
+        
         self.get_logger().info('Received message pic')
+
+        turn = self.lane_holding(msg.line)
 
         if msg.sign in self.park_con_triggers:
             #send action to park_con
@@ -95,16 +111,19 @@ class lane_con(Node):
             #stop controll
             return
         elif msg.sign == "red light":
-            #hold on line until green light
-            pass 
+            
+            self.get_logger().info("Halten an roter Ampel")
+            self.driving_sender("stop", turn)
+
         elif msg.sign == "green light":
-            #continue 
-            #if red light mode also continue
-            pass 
+
+            self.get_logger().info("Weiterfahren an grüner Ampel") 
+            self.driving_sender("drive_normal", turn)
+
         elif msg.sign == "":
             #do nothing special
             #lane holding algorithm
-            self.driving_sender("drive_normal")
+            self.driving_sender("drive_normal", turn)
              
         else:
             self.get_logger().info("Error in pic_callback string sign: false value")
@@ -117,7 +136,74 @@ class lane_con(Node):
             pass 
         # obstacle avoidance algorithm
 
-    def driving_sender(self, command):
+    # Determine and return turn speed to hold the lane
+    def lane_holding(self, data):
+
+        # Needed parameters 
+        boundary_left = self.get_parameter('boundary_left').get_parameter_value().integer_value
+        boundary_right = self.get_parameter('boundary_right').get_parameter_value().integer_value
+        speed_drive = self.get_parameter('speed_drive').get_parameter_value().double_value
+        speed_turn = self.get_parameter('speed_turn').get_parameter_value().double_value
+        light_lim = self.get_parameter('light_lim').get_parameter_value().integer_value
+        last_spin = self.last_spin
+
+        # Formating data 
+        img_row = data[boundary_left:boundary_right]
+        
+        # 20 greatest items sorted
+        img_row_sorted = np.argsort(img_row)[-20:]
+
+        # Values of 20 greatest items
+        largest_values = img_row[img_row_sorted]
+
+        # Index des mittleren Wertes der 20 größten im Teil-Array
+        middle_index_in_subset = np.argsort(largest_values)[len(largest_values) // 2]
+
+        # Index des mittleren Wertes im Original-Array
+        middle_index_in_original = img_row_sorted[middle_index_in_subset]
+
+        # Hellstes Element 
+        brightest = max(img_row)
+
+        line_pos = middle_index_in_original + boundary_left
+        
+        offset = abs(line_pos-middle_pix)
+        offset_scaling = 23
+
+        middle_pix = 550 # für 320px
+        speed = 0.0
+        turn = 0.0
+        
+        if(brightest < light_lim  and last_spin == False):        
+            # no white in bottom line of image 
+            speed= 0.0
+            turn = -speed_turn/2
+            #self.get_logger().info('Hallo if1')
+        elif(brightest < light_lim and last_spin == True):
+            speed= 0.0
+            turn = speed_turn/2
+            #self.get_logger().info('Hallo elif1')
+        else:
+            speed=speed_drive
+            #white pixel in image line / and bright_pos > boundary_left)
+            if line_pos < (middle_pix) :
+                #left side is brightest: turn left '+' (Drehrichtung Roboter 30)
+                turn = speed_turn * (offset/offset_scaling)
+                self.last_spin = False
+                #self.get_logger().info('Hallo if2')
+            # and bright_pos < boundary_right)
+            elif line_pos > (middle_pix) :
+                # right side right turn '-'
+                turn = -speed_turn * (offset/offset_scaling)
+                self.last_spin = True
+                #self.get_logger().info('Hallo elif2')
+            else :
+                    # bright pixel is in the middle 
+                    turn = 0.0
+        
+        return turn
+
+    def driving_sender(self, command, turn):
         # commands: stop, drive_normal, drive_slow, drive_fast
         msg = Twist()
         if command == "stop":
@@ -128,7 +214,7 @@ class lane_con(Node):
 
         elif command == "drive_normal":
             msg.linear.x = 0.075
-            msg.angular.z = 0.0
+            msg.angular.z = turn
 
             self.get_logger().info("drive_normal command")
         else:
@@ -141,7 +227,6 @@ class lane_con(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = lane_con()
-    node.test("")
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
