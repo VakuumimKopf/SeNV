@@ -1,17 +1,17 @@
 import rclpy
+import rclpy.action
 from rclpy.node import Node
 from rclpy.action import ActionServer
 from rclpy.action.server import ServerGoalHandle
+from geometry_msgs.msg import Twist
 from senv_interfaces.msg import Pic,Laser 
 from senv_interfaces.action import ConTask
 
-import time
 
-
-class intersection_con(Node):
+class obstacle_con(Node):
     def __init__(self):
-        super().__init__('intersection_con')
-        self.get_logger().info('intersection_con node has been started.')
+        super().__init__('obstacle_con')
+        self.get_logger().info('obstacle_con node has been started.')
 
         # Parameters
         self.turned_on = False
@@ -37,23 +37,22 @@ class intersection_con(Node):
         )
         self.subscriber_laser  # prevent unused variable warning
 
-        self.intersection_task_server_ = ActionServer(
+        self.obstacle_task_server = ActionServer(
             self,
             ConTask,
-            "intersection_task",
+            "obstacle_task",
             self.execute_callback
         )
 
     def execute_callback(self, goal_handle: ServerGoalHandle):
-        
+
         # Get request from goal
         target = goal_handle.request.start_working
-        self.get_logger().info("starting intersection server")
+        self.get_logger().info("starting obstacle server")
 
         # Execute action 
         self.turned_on = target
         self.datahandler()
-        self.get_logger().info("Handling intersection complete")
 
         # Final Goal State
         goal_handle.succeed()
@@ -78,13 +77,12 @@ class intersection_con(Node):
         # obstacle avoidance
 
     def datahandler(self):
-        self.get_logger().info("Handling intersection data")
-        time.sleep(100)
-
+        self.get_logger().info("Handling obstacle data")
+        
 
 def main(args=None):
     rclpy.init(args=args)
-    node = intersection_con()
+    node = obstacle_con()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()

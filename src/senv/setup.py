@@ -28,15 +28,9 @@ setup(
             'lane_con = senv.lane_con:main',
             'intersection_con = senv.intersection_con:main',
             'park_con = senv.park_con:main',
-<<<<<<< HEAD
             'driver = senv.driver:main',
-            'laserscanner = senv.laserscanner:main',
-            'camera = senv.camera:main',
-=======
-            'driving = senv.driving:main',
             'camera = senv.camera:main',
             'laserscanner = senv.laserscanner:main',
->>>>>>> c16411254d4dbc1762a597ba784d2dfd2d3f7ad0
         ],
     },
 )

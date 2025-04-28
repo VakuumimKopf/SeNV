@@ -31,6 +31,11 @@ class laserscanner(rclpy.node.Node):
         self.declare_parameter('laser_front', 0)
         self.declare_parameter('turn_time', 2.0) # must ideally equal to an integer when divided by timer_period 
 
+
+        #self.img_row = np.array([0, 64, 128, 192, 255], dtype=np.uint8) # Beispiel
+        self.img_row = np.random.randint(0, 256, 640, dtype=np.uint8)
+
+
         # definition of the QoS in order to receive data despite WiFi
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST,

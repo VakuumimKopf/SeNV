@@ -73,5 +73,13 @@ def generate_launch_description():
             emulate_tty=True,
             arguments=[('__log_level:=debug')],
         ),
+        Node(
+            package='senv',
+            executable='driver',
+            # activate output
+            output='screen',
+            emulate_tty=True,
+            arguments=[('__log_level:=debug')],
+        ),
     ])
 >>>>>>> c16411254d4dbc1762a597ba784d2dfd2d3f7ad0
