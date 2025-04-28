@@ -9,10 +9,14 @@ from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge, CvBridgeError
+from senv_interfaces.msg import Laser
 
 class laserscanner(rclpy.node.Node):
     def __init__(self):
         super().__init__('laserturn')
+
+        self.front_distance = 0.0
+        self.is_turning = False
 
         # definition of the parameters that can be changed at runtime
         self.declare_parameter('distance_to_turn', 0.45)
@@ -20,6 +24,11 @@ class laserscanner(rclpy.node.Node):
         self.declare_parameter('speed_turn', 0.5)
         self.declare_parameter('laser_front', 0)
         self.declare_parameter('turn_time', 2.0) # must ideally equal to an integer when divided by timer_period 
+
+
+        #self.img_row = np.array([0, 64, 128, 192, 255], dtype=np.uint8) # Beispiel
+        self.img_row = np.random.randint(0, 256, 640, dtype=np.uint8)
+
 
         # definition of the QoS in order to receive data despite WiFi
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
@@ -33,14 +42,12 @@ class laserscanner(rclpy.node.Node):
             self.scanner_callback,
             qos_profile=qos_policy)
         self.subscription  # prevent unused variable warning
-        self.front_distance = 0.0
+
         # create publisher for driving commands
-        self.publisher_laserturn = self.create_publisher(Int16 , 'laser', 1)
-        self.is_turning = False
+        self.publisher_laserturn = self.create_publisher(Laser , 'laser', 1)
+
         # create timer to periodically invoke the driving logic
         self.timer_period = 0.5  # seconds
-        self.counter = 0
-        self.turn_time = self.get_parameter('turn_time').get_parameter_value().double_value
         self.my_timer = self.create_timer(self.timer_period, self.timer_callback)
     
     # handling received laser scan data
@@ -52,14 +59,10 @@ class laserscanner(rclpy.node.Node):
     # driving logics
     def timer_callback(self):
         self.get_logger().info("laserscannercallback")
-        if ((self.front_distance <= 0.2) & (self.front_distance != 0.0 )) :
-            msg = Int16()
-            msg.data = 0
-        else:
-            msg = Int16()
-            msg.data = 1
-        # send message
-        #self.get_logger().info("Msg", msg)
+        
+        msg = Laser()
+        msg.distance = self.front_distance
+        msg.angle = 0
         self.publisher_laserturn.publish(msg)
 
 def main(args=None):
