@@ -25,7 +25,7 @@ class lane_con(Node):
         self.line_pos = 0
         self.hold_on_red = False
         self.last_spin = False # False == gegen Uhrzeigersinn True==mit Uhrzeigersinn
-
+        self.obstacle_detect = False
         self.is_turned_on = True
         self.park_con_triggers = ["park_sign"]
         self.intersection_con_triggers = ["intersection_sign_left", "intersection_sign_right", "intersection_sign_straight"]
@@ -106,49 +106,50 @@ class lane_con(Node):
         speed,turn = self.lane_holding(msg.line)
 
 
-        if self.hold_on_red == False:
-            if msg.sign in self.park_con_triggers:
+        #if self.hold_on_red == False:
+        if msg.sign in self.park_con_triggers:
 
-                #send action to park_con
-                #stop controll 
-                return
-            
-            elif msg.sign in self.intersection_con_triggers:
+            #send action to park_con
+            #stop controll 
+            return
+        
+        elif msg.sign in self.intersection_con_triggers:
 
-                #send action to intersection_con
-                #stop controll
-                return
+            #send action to intersection_con
+            #stop controll
+            return
+        
+        elif msg.sign == "red light":
+        
+            self.hold_on_red = True
+            self.get_logger().info("Halten an roter Ampel")
+            self.driving_sender("stop",speed, turn)   
+            return
             
-            elif msg.sign == "red light":
-            
-                self.hold_on_red = True
-                self.get_logger().info("Halten an roter Ampel")
-                self.driving_sender("stop",speed, turn)   
-                return
-             
-            elif msg.sign == "":
+        elif msg.sign == "green light":
 
-                #do nothing special
-                #lane holding algorithm
-                self.driving_sender("drive_normal",speed, turn)
-                return
-                
-            else:
-                self.get_logger().info("Error in pic_callback string sign: false value")
-                return
+            self.hold_on_red == False
+            self.get_logger().info("Weiterfahren an grüner Ampel") 
+            self.driving_sender("drive_normal",speed, turn)
+            return
+            
+        elif msg.sign == "":
+
+            #do nothing special
+            #lane holding algorithm
+            self.driving_sender("drive_normal",speed, turn)
+            return
+            
         else:
-            if msg.sign == "green light":
-
-                self.hold_on_red == False
-                self.get_logger().info("Weiterfahren an grüner Ampel") 
-                self.driving_sender("drive_normal",speed, turn)
-                return
+            self.get_logger().info("Error in pic_callback string sign: false value")
+            return
 
     def laser_callback(self, msg: Laser):
         # Process incoming message and decide what to do --> give this information to sender
         self.get_logger().info('Received message laser')
-        if msg.distance <= self.min_obstacle_distance:
+        if msg.distance <= self.min_obstacle_distance and msg.distance != 0:
             #tell sender to stop
+            self.obstacle_detect = True
             pass 
         # obstacle avoidance algorithm
 
@@ -222,7 +223,7 @@ class lane_con(Node):
     def driving_sender(self, command, speed, turn):
         # commands: stop, drive_normal, drive_slow, drive_fast
         msg = Twist()
-        if command == "stop":
+        if command == "stop" or self.obstacle_detect == True:
             msg.angular.z = 0.0
             msg.linear.x = 0.0
 

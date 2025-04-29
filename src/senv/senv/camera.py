@@ -42,7 +42,7 @@ class camera(Node):
         self.publisher_ = self.create_publisher(Pic, 'pic', 1)
 
         #create timers for data handling 
-        self.line_timer_period = 0.5
+        self.line_timer_period = 0.1
         self.line_timer = self.create_timer(self.line_timer_period, self.line_detection)
 
         self.status = ""
@@ -139,8 +139,8 @@ class camera(Node):
         upper_red2 = np.array([179, 255, 255])
 
         # Farbgrenzen für Grün (Ampelgrün)
-        lower_green = np.array([40, 50, 50])
-        upper_green = np.array([90, 255, 255])
+        lower_green = np.array([50, 150, 150])
+        upper_green = np.array([85, 255, 255])
 
 
         mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
@@ -196,6 +196,7 @@ class camera(Node):
             self.waitingforgreen = False
 
         cv2.imshow("IMG_red", red_mask)
+        cv2.imshow("IMG_green", green_mask)
         cv2.waitKey(1)
         
         #Function for trafficlights - string for Output("red light", "green light")
