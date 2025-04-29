@@ -18,7 +18,8 @@ class camera(Node):
         self.bridge = CvBridge()
         self.status = ""
         self.line_pos = 0
-        self.hsv = np.ndarray([])
+        self.hsv = np.array([])
+        self.waitingforgreen = False
         #self.img_row = np.array([0, 64, 128, 192, 255], dtype=np.uint8) # Beispiel
         self.img_row = np.random.randint(0, 256, 640, dtype=np.uint8)
 
@@ -45,7 +46,7 @@ class camera(Node):
         self.line_timer = self.create_timer(self.line_timer_period, self.line_detection)
 
         self.status = ""
-        self.sign_timer_period = 1.0
+        self.sign_timer_period = 0.5
         self.sign_timer = self.create_timer(self.sign_timer_period, self.sign_detection)
 
     # raw data formating routine 
@@ -75,8 +76,10 @@ class camera(Node):
 
         roi = img_cv[y_start:y_end, x_start:x_end]
 
-        self.hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-
+        if roi.size == 0:
+            self.hsv = None
+        else:
+            self.hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
 
         # Formating data 
         img_row = img_row[boundary_left:boundary_right]
@@ -99,8 +102,8 @@ class camera(Node):
             self.line_pos = middle_index_in_original + boundary_left
         # show image
         #cv2.imshow("IMG_ROW", img_row)
-        #cv2.imshow("IMG", img_cv)
-        #cv2.waitKey(1)
+        cv2.imshow("IMG", img_cv)
+        cv2.waitKey(1)
     
     # line detection in formated data
     def line_detection(self):
@@ -108,6 +111,8 @@ class camera(Node):
 
         # Nachricht veröffentlichen
         msg = Pic()
+        if self.waitingforgreen == True:
+            self.status = "red light"
         msg.sign = self.status
         #self.get_logger().info(msg.sign)
         msg.line = int(self.line_pos)
@@ -118,37 +123,80 @@ class camera(Node):
     # sign detection in fomated data
     def sign_detection(self):
         #self.get_logger().info("sign_detection gestartet")
+        min_area = 30    # Minimale Fläche (z. B. Ampellicht)
+        max_area = 200 
         hsv = self.hsv
         self.status = ""
-        if hsv == []:
+        if (hsv.size == 0):
             self.status = ""
-        else:    
+            return
         #Function for signs - string for Outputs("")
-            min_area = 30 # Minimale fläche für rotes licht
-                # Farbgrenzen für rot
-            lower_red1 = np.array([0, 100, 100])
-            upper_red1 = np.array([10, 255, 255])
-            lower_red2 = np.array([160, 100, 100])
-            upper_red2 = np.array([179, 255, 255])
-            self.get_logger().info(f"HSV: {hsv.shape}")
-            mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
-            mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
-            red_mask = cv2.bitwise_or(mask1, mask2)
+        min_area = 30 # Minimale fläche für rotes licht
+        # Farbgrenzen für rot
+        lower_red1 = np.array([0, 100, 100])
+        upper_red1 = np.array([10, 255, 255])
+        lower_red2 = np.array([160, 100, 100])
+        upper_red2 = np.array([179, 255, 255])
 
-            # Optionale Rauschunterdrückung
-            red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
-            red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+        # Farbgrenzen für Grün (Ampelgrün)
+        lower_green = np.array([40, 50, 50])
+        upper_green = np.array([90, 255, 255])
+
+
+        mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
+        mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
+        red_mask = cv2.bitwise_or(mask1, mask2)
+        # Optionale Rauschunterdrückung
+        '''#red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+        #red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
 
             # Konturen finden
-            contours, _ = cv2.findContours(red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        #contours, _ = cv2.findContours(red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for contour in contours:
+            area = cv2.contourArea(contour)
+            if area > min_area:
+                self.status = 'red light'
+                # Grüne Fläche suchen'''
+        
+        green_mask = cv2.inRange(hsv, lower_green, upper_green)
 
-            # Überprüfen, ob ein Fleck groß genug ist
-            for contour in contours:
-                area = cv2.contourArea(contour)
-                if area > min_area:
-                    self.status = 'red light'
-            cv2.imshow("IMG", red_mask)
-            cv2.waitKey(1)
+        # Rauschunterdrückung
+        kernel = np.ones((5, 5), np.uint8)
+        red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN, kernel)
+        red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_CLOSE, kernel)
+        green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_OPEN, kernel)
+        green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_CLOSE, kernel)
+
+        # Konturen analysieren
+        contours_red, _ = cv2.findContours(red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours_green, _ = cv2.findContours(green_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        max_red_area = 0
+        max_green_area = 0
+
+        # Rote Fläche suchen
+        for contour in contours_red:
+            area = cv2.contourArea(contour)
+            if min_area < area < max_area:
+                max_red_area = max(max_red_area, area)
+                # Überprüfen, ob ein Fleck groß genug ist
+            
+
+        for contour in contours_green:
+            area = cv2.contourArea(contour)
+            if min_area < area < max_area:
+                max_green_area = max(max_green_area, area)
+
+        # Statuslogik
+        if max_red_area > 0:
+            self.status = 'red light'
+            self.waitingforgreen = True
+        if max_green_area >= max_red_area and max_green_area > 0:
+            self.status = 'green light'
+            self.waitingforgreen = False
+
+        cv2.imshow("IMG_red", red_mask)
+        cv2.waitKey(1)
         
         #Function for trafficlights - string for Output("red light", "green light")
 
