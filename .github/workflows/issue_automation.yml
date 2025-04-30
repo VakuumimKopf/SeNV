@@ -1,6 +1,7 @@
 name: Issue Automation
 
 on:
+  workflow_dispatch:
   issues:
     types: [opened]
 
