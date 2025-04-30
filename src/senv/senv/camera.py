@@ -123,8 +123,8 @@ class camera(Node):
     # sign detection in fomated data
     def sign_detection(self):
         #self.get_logger().info("sign_detection gestartet")
-        min_area = 30    # Minimale Fläche (z. B. Ampellicht)
-        max_area = 200 
+        min_area = 30   # Minimale Fläche (z. B. Ampellicht)
+        max_area = 2000 
         hsv = self.hsv
         self.status = ""
         if (hsv.size == 0):
@@ -139,7 +139,7 @@ class camera(Node):
         upper_red2 = np.array([179, 255, 255])
 
         # Farbgrenzen für Grün (Ampelgrün)
-        lower_green = np.array([50, 150, 150])
+        lower_green = np.array([50, 150, 50])
         upper_green = np.array([85, 255, 255])
 
 
