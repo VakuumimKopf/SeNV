@@ -1,72 +1,34 @@
-name: Issue Automation
-
+name: “Initialize issue in project”
 on:
-  workflow_dispatch:
   issues:
     types: [opened]
 
 jobs:
-  add_to_project_and_update_fields:
+  init:
     runs-on: ubuntu-latest
     steps:
-    - name: Add issue to project and set fields
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        # Extract issue details
-        ISSUE_NODE_ID=$(jq -r '.issue.node_id' "$GITHUB_EVENT_PATH")
-        CREATED_AT=$(jq -r '.issue.created_at' "$GITHUB_EVENT_PATH")
-        START_DATE=$(date -u -d "$CREATED_AT" +"%Y-%m-%d")
+      # 1) Extract just the YYYY-MM-DD part of the issue’s created_at timestamp
+      - name: Extract issue creation date
+        id: extract
+        run: |
+          # The GitHub webhook payload has created_at like "2025-04-29T14:23:05Z"
+          created=$(echo "${{ github.event.issue.created_at }}" | cut -d'T' -f1)
+          echo "date=$created" >> $GITHUB_OUTPUT
 
-        # Add debug logs
-        echo "Issue Node ID: $ISSUE_NODE_ID"
-        echo "Created At: $CREATED_AT"
-        echo "Start Date: $START_DATE"
+      # 2) Optionally set a Status single-select in your Project 
+      - name: Set issue Status to “To do”
+        uses: nipe0324/update-project-v2-item-field@v2.0.2
+        with:
+          project-url: https://github.com/users/VakuumimKopf/projects/3
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          field-name: Status
+          field-value: Backlog
 
-        # Replace PROJECT_ID, START_DATE_FIELD_ID, and STATUS_FIELD_ID with your actual IDs
-        GRAPHQL_QUERY=$(cat <<EOF
-        mutation {
-          addProjectV2ItemById(input: {projectId: "PVT_kwHOCQXJ6M4A2N9V", contentId: "$ISSUE_NODE_ID"}) {
-            item {
-              id
-            }
-          }
-          updateProjectV2ItemFieldValue(
-            input: {
-              projectId: "PVT_kwHOCQXJ6M4A2N9V",
-              itemId: "$ISSUE_NODE_ID",
-              fieldId: "PVTF_lAHOCQXJ6M4A2N9Vzgrj4tQ",
-              value: "$START_DATE"
-            }
-          ) {
-            projectV2Item {
-              id
-            }
-          }
-          updateProjectV2ItemFieldValue(
-            input: {
-              projectId: "PVT_kwHOCQXJ6M4A2N9V",
-              itemId: "$ISSUE_NODE_ID",
-              fieldId: "PVTSSF_lAHOCQXJ6M4A2N9Vzgrj4ds",
-              value: "Backlog"
-            }
-          ) {
-            projectV2Item {
-              id
-            }
-          }
-        }
-        EOF
-        )
-
-        # Debug the GraphQL query
-        echo "GraphQL Query: $GRAPHQL_QUERY"
-
-        # Execute GraphQL query and log the response
-        RESPONSE=$(curl -X POST \
-          -H "Authorization: Bearer $GITHUB_TOKEN" \
-          -H "Content-Type: application/json" \
-          -d "{\"query\":\"$GRAPHQL_QUERY\"}" \
-          https://api.github.com/graphql)
-        
-        echo "GraphQL Response: $RESPONSE"
+      # 3) Set your Start Date field to the extracted creation date
+      - name: Set Start Date
+        uses: nipe0324/update-project-v2-item-field@v2.0.2
+        with:
+          project-url: https://github.com/users/VakuumimKopf/projects/3
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          field-name: Start Date
+          field-value: ${{ steps.extract.outputs.date }}
