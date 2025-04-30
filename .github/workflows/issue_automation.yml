@@ -1,20 +1,23 @@
-name: Assign Created Issues to Project
+name: Issue Automation
 
 on:
   issues:
     types: [opened]
 
 jobs:
-  assign_to_project:
+  add_to_project_and_update_fields:
     runs-on: ubuntu-latest
     steps:
-    - name: Assign issue to project
+    - name: Add issue to project and set fields
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
+        # Extract issue details
         ISSUE_NODE_ID=$(jq -r '.issue.node_id' "$GITHUB_EVENT_PATH")
+        CREATED_AT=$(jq -r '.issue.created_at' "$GITHUB_EVENT_PATH")
+        START_DATE=$(date -u -d "$CREATED_AT" +"%Y-%m-%d")
 
-        
+        # Replace PROJECT_ID, START_DATE_FIELD_ID, and STATUS_FIELD_ID with your actual IDs
         GRAPHQL_QUERY=$(cat <<EOF
         mutation {
           addProjectV2ItemById(input: {projectId: "PVT_kwHOCQXJ6M4A2N9V", contentId: "$ISSUE_NODE_ID"}) {
@@ -22,13 +25,37 @@ jobs:
               id
             }
           }
+          updateProjectV2ItemFieldValue(
+            input: {
+              projectId: "PVT_kwHOCQXJ6M4A2N9V",
+              itemId: "$ISSUE_NODE_ID",
+              fieldId: "PVTF_lAHOCQXJ6M4A2N9Vzgrj4tQ",
+              value: "$START_DATE"
+            }
+          ) {
+            projectV2Item {
+              id
+            }
+          }
+          updateProjectV2ItemFieldValue(
+            input: {
+              projectId: "PVT_kwHOCQXJ6M4A2N9V",
+              itemId: "$ISSUE_NODE_ID",
+              fieldId: "PVTSSF_lAHOCQXJ6M4A2N9Vzgrj4ds",
+              value: "Backlog"
+            }
+          ) {
+            projectV2Item {
+              id
+            }
+          }
         }
         EOF
         )
 
+        # Execute GraphQL query
         curl -X POST \
           -H "Authorization: Bearer $GITHUB_TOKEN" \
           -H "Content-Type: application/json" \
           -d "{\"query\":\"$GRAPHQL_QUERY\"}" \
           https://api.github.com/graphql
-      
