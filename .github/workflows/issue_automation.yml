@@ -1,0 +1,34 @@
+name: Assign Created Issues to Project
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  assign_to_project:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Assign issue to project
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        ISSUE_NODE_ID=$(jq -r '.issue.node_id' "$GITHUB_EVENT_PATH")
+
+        
+        GRAPHQL_QUERY=$(cat <<EOF
+        mutation {
+          addProjectV2ItemById(input: {projectId: "PVT_kwHOCQXJ6M4A2N9V", contentId: "$ISSUE_NODE_ID"}) {
+            item {
+              id
+            }
+          }
+        }
+        EOF
+        )
+
+        curl -X POST \
+          -H "Authorization: Bearer $GITHUB_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "{\"query\":\"$GRAPHQL_QUERY\"}" \
+          https://api.github.com/graphql
+      
