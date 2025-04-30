@@ -17,6 +17,11 @@ jobs:
         CREATED_AT=$(jq -r '.issue.created_at' "$GITHUB_EVENT_PATH")
         START_DATE=$(date -u -d "$CREATED_AT" +"%Y-%m-%d")
 
+        # Add debug logs
+        echo "Issue Node ID: $ISSUE_NODE_ID"
+        echo "Created At: $CREATED_AT"
+        echo "Start Date: $START_DATE"
+
         # Replace PROJECT_ID, START_DATE_FIELD_ID, and STATUS_FIELD_ID with your actual IDs
         GRAPHQL_QUERY=$(cat <<EOF
         mutation {
@@ -42,7 +47,7 @@ jobs:
               projectId: "PVT_kwHOCQXJ6M4A2N9V",
               itemId: "$ISSUE_NODE_ID",
               fieldId: "PVTSSF_lAHOCQXJ6M4A2N9Vzgrj4ds",
-              value: "f75ad846"
+              value: "Backlog"
             }
           ) {
             projectV2Item {
@@ -53,9 +58,14 @@ jobs:
         EOF
         )
 
-        # Execute GraphQL query
-        curl -X POST \
+        # Debug the GraphQL query
+        echo "GraphQL Query: $GRAPHQL_QUERY"
+
+        # Execute GraphQL query and log the response
+        RESPONSE=$(curl -X POST \
           -H "Authorization: Bearer $GITHUB_TOKEN" \
           -H "Content-Type: application/json" \
           -d "{\"query\":\"$GRAPHQL_QUERY\"}" \
-          https://api.github.com/graphql
+          https://api.github.com/graphql)
+        
+        echo "GraphQL Response: $RESPONSE"
