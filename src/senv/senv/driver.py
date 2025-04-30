@@ -5,7 +5,6 @@ from std_msgs.msg import Int16
 from senv.stopper import Stopper
 from geometry_msgs.msg import Twist
 from enum import Enum
-from std_msgs.msg import String
 
 class State(Enum):
     FollowLine = 1
