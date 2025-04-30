@@ -1,12 +1,14 @@
 
 import rclpy
+import numpy as np
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from rclpy.action import ActionClient
 from rclpy.action.client import ClientGoalHandle
 from senv_interfaces.msg import Pic,Laser
 from senv_interfaces.action import ConTask
-import numpy as np
+from std_msgs.msg import String
+
 
 
 class lane_con(Node):
@@ -27,12 +29,13 @@ class lane_con(Node):
         self.last_spin = False # False == gegen Uhrzeigersinn True==mit Uhrzeigersinn
         self.obstacle_detect = False
         self.is_turned_on = True
+        self.last_state = ""
+        self.last_spin = False
         self.park_con_triggers = ["park_sign"]
         self.intersection_con_triggers = ["intersection_sign_left", "intersection_sign_right", "intersection_sign_straight"]
         # Qos policy setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST,depth=1)
-        self.last_spin = False
         # Subscribing to camera and laser topics
         self.subscriber_pic = self.create_subscription(
             Pic,  # Replace with the actual message type
@@ -70,6 +73,7 @@ class lane_con(Node):
         )
 
         self.publisher_ = self.create_publisher(Twist, "driving", 1)
+        self.publisher_state = self.create_publisher(String, "state", 1)
 
     # Sending request to action server 
     def send_goal(self, working_status, client: ActionClient):
@@ -101,10 +105,9 @@ class lane_con(Node):
     # Process the incoming message and decide whats to do --> give this information to sender    
     def pic_callback(self, msg: Pic):
         
-        self.get_logger().info('Received message pic: ' + msg.sign)
+        #self.get_logger().info('Received message pic: ' + msg.sign)
 
         speed,turn = self.lane_holding(msg.line)
-
 
         #if self.hold_on_red == False:
         if msg.sign in self.park_con_triggers:
@@ -146,7 +149,7 @@ class lane_con(Node):
 
     def laser_callback(self, msg: Laser):
         # Process incoming message and decide what to do --> give this information to sender
-        self.get_logger().info('Received message laser')
+        #self.get_logger().info('Received message laser')
         if msg.distance <= self.min_obstacle_distance and msg.distance != 0:
             #tell sender to stop
             self.obstacle_detect = True
@@ -223,21 +226,28 @@ class lane_con(Node):
     def driving_sender(self, command, speed, turn):
         # commands: stop, drive_normal, drive_slow, drive_fast
         msg = Twist()
+        state = String()
+        state.data = command
         if command == "stop" or self.obstacle_detect == True:
             msg.angular.z = 0.0
             msg.linear.x = 0.0
+            
+
 
             self.get_logger().info("stop command")
 
         elif command == "drive_normal":
             msg.linear.x = speed
             msg.angular.z = turn
+            
 
             self.get_logger().info("drive_normal command")
         else:
             self.get_logger().info("Error lane_con: driving_sender: unkown command")
-
+        if self.last_state != command:
+            self.publisher_state.publish(state)
         self.publisher_.publish(msg)
+        self.last_state = command
 
 
 
