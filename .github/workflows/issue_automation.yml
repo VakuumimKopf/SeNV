@@ -42,7 +42,7 @@ jobs:
               projectId: "PVT_kwHOCQXJ6M4A2N9V",
               itemId: "$ISSUE_NODE_ID",
               fieldId: "PVTSSF_lAHOCQXJ6M4A2N9Vzgrj4ds",
-              value: "Backlog"
+              value: "f75ad846"
             }
           ) {
             projectV2Item {
