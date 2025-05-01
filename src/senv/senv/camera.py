@@ -8,28 +8,33 @@ import numpy as np
 
 from senv_interfaces.msg import Pic
 
+
 class camera(Node):
     def __init__(self):
         super().__init__('camera')
-        #set Parameters 
-        self.declare_parameter('boundary_left', 100) # 200 für 640px, 100 für 320
-        self.declare_parameter('boundary_right', 630) # 440 für 640px, 220 für 320px
+        # set Parameters
+        self.declare_parameter('boundary_left', 100)
+        # 200 für 640px, 100 für 320
+        self.declare_parameter('boundary_right', 630)
+        # 440 für 640px, 220 für 320px
         self.declare_parameter('light_lim', 100)
         self.bridge = CvBridge()
         self.status = ""
         self.line_pos = 0
         self.hsv = np.array([])
         self.waitingforgreen = False
-        #self.img_row = np.array([0, 64, 128, 192, 255], dtype=np.uint8) # Beispiel
+        # Beispiel
+        # self.img_row = np.array([0, 64, 128, 192, 255], dtype=np.uint8)
         self.img_row = np.random.randint(0, 256, 640, dtype=np.uint8)
 
         # definition of the QoS in order to receive data despite WiFi
-        qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
-                                          history=rclpy.qos.HistoryPolicy.KEEP_LAST,
-                                          depth=1)
-        
-        self.last_spin = False # False == gegen UHrzeigersinn True==mit Uhrzeigersinn
-        
+        qos_policy = rclpy.qos.QoSProfile(
+            reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
+            history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
+
+        self.last_spin = False
+        # False == gegen UHrzeigersinn True==mit Uhrzeigersinn
+
         # create subscribers for image data with changed qos
         self.subscription = self.create_subscription(
             CompressedImage,
@@ -38,35 +43,36 @@ class camera(Node):
             qos_profile=qos_policy)
         self.subscription  # prevent unused variable warning
 
-        #create topic to publish data
+        # create topic to publish data
         self.publisher_ = self.create_publisher(Pic, 'pic', 1)
 
-        #create timers for data handling 
+        # create timers for data handling
         self.line_timer_period = 0.1
-        self.line_timer = self.create_timer(self.line_timer_period, self.line_detection)
+        self.line_timer = self.create_timer(
+            self.line_timer_period, self.line_detection)
 
         self.status = ""
         self.sign_timer_period = 0.5
-        self.sign_timer = self.create_timer(self.sign_timer_period, self.sign_detection)
+        self.sign_timer = self.create_timer(
+            self.sign_timer_period, self.sign_detection)
 
-    # raw data formating routine 
+    # raw data formating routine
     def image_callback(self, data):
         boundary_left = self.get_parameter('boundary_left').get_parameter_value().integer_value
         boundary_right = self.get_parameter('boundary_right').get_parameter_value().integer_value
         light_lim = self.get_parameter('light_lim').get_parameter_value().integer_value
 
-        # Eingang roh daten werden gefiltert und es wird der ein Int Array 
-        # gespeichert unter self.img_row abgelegt um dann in line_detection gepublisht zu werden  
+        # Eingang roh daten werden gefiltert und es wird der ein Int Array
+        # gespeichert unter self.img_row abgelegt um dann in line_detection gepublisht zu werden
 
-        img_cv = self.bridge.compressed_imgmsg_to_cv2(data, desired_encoding = 'passthrough')
+        img_cv = self.bridge.compressed_imgmsg_to_cv2(data, desired_encoding='passthrough')
 
         # convert image to grayscale
         height, width, _ = img_cv.shape
         img_gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
-        img_row = img_gray[height-9,:]
+        img_row = img_gray[height-9, :]
 
         # Speichere HSV für farbanalyse in sign detection
-
 
         # Bereich: rechtes Drittel, mittleres Drittel vertikal
         x_start = width * 2 // 3
@@ -81,9 +87,9 @@ class camera(Node):
         else:
             self.hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
 
-        # Formating data 
+        # Formating data
         img_row = img_row[boundary_left:boundary_right]
-        
+
         # 20 greatest items sorted
         img_row_sorted = np.argsort(img_row)[-20:]
 
@@ -96,42 +102,42 @@ class camera(Node):
         # Index des mittleren Wertes im Original-Array
         middle_index_in_original = img_row_sorted[middle_index_in_subset]
         self.line_pos = 0
-        # Hellstes Element 
+        # Hellstes Element
         brightest = max(img_row)
         if brightest > light_lim:
             self.line_pos = middle_index_in_original + boundary_left
         # show image
-        #cv2.imshow("IMG_ROW", img_row)
+        # cv2.imshow("IMG_ROW", img_row)
         cv2.imshow("IMG", img_cv)
         cv2.waitKey(1)
-    
+
     # line detection in formated data
     def line_detection(self):
-        #self.get_logger().info("line_detection gestartet")
+        # self.get_logger().info("line_detection gestartet")
 
         # Nachricht veröffentlichen
         msg = Pic()
-        if self.waitingforgreen == True:
+        if self.waitingforgreen is True:
             self.status = "red light"
         msg.sign = self.status
-        #self.get_logger().info(msg.sign)
+        # self.get_logger().info(msg.sign)
         msg.line = int(self.line_pos)
-        #self.get_logger().info(msg.line)
+        # self.get_logger().info(msg.line)
 
         self.publisher_.publish(msg)
 
     # sign detection in fomated data
     def sign_detection(self):
-        #self.get_logger().info("sign_detection gestartet")
+        # self.get_logger().info("sign_detection gestartet")
         min_area = 30   # Minimale Fläche (z. B. Ampellicht)
-        max_area = 2000 
+        max_area = 2000
         hsv = self.hsv
         self.status = ""
         if (hsv.size == 0):
             self.status = ""
             return
-        #Function for signs - string for Outputs("")
-        min_area = 30 # Minimale fläche für rotes licht
+        # Function for signs - string for Outputs("")
+        min_area = 30  # Minimale fläche für rotes licht
         # Farbgrenzen für rot
         lower_red1 = np.array([0, 100, 100])
         upper_red1 = np.array([10, 255, 255])
@@ -141,7 +147,6 @@ class camera(Node):
         # Farbgrenzen für Grün (Ampelgrün)
         lower_green = np.array([50, 150, 50])
         upper_green = np.array([85, 255, 255])
-
 
         mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
         mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
@@ -157,7 +162,7 @@ class camera(Node):
             if area > min_area:
                 self.status = 'red light'
                 # Grüne Fläche suchen'''
-        
+
         green_mask = cv2.inRange(hsv, lower_green, upper_green)
 
         # Rauschunterdrückung
@@ -180,7 +185,6 @@ class camera(Node):
             if min_area < area < max_area:
                 max_red_area = max(max_red_area, area)
                 # Überprüfen, ob ein Fleck groß genug ist
-            
 
         for contour in contours_green:
             area = cv2.contourArea(contour)
@@ -198,9 +202,8 @@ class camera(Node):
         cv2.imshow("IMG_red", red_mask)
         cv2.imshow("IMG_green", green_mask)
         cv2.waitKey(1)
-        
-        #Function for trafficlights - string for Output("red light", "green light")
 
+        # Function for trafficlights - string for Output("red light", "green light")
 
 
 def main(args=None):
@@ -213,6 +216,7 @@ def main(args=None):
         pass
     finally:
         node.destroy_node()
+
 
 if __name__ == '__main__':
 
