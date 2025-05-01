@@ -1,4 +1,4 @@
-name: “Initialize issue in project”
+name: "Initialize issue in project"
 on:
   issues:
     types: [opened]
@@ -13,6 +13,7 @@ jobs:
         run: |
           # The GitHub webhook payload has created_at like "2025-04-29T14:23:05Z"
           created=$(echo "${{ github.event.issue.created_at }}" | cut -d'T' -f1)
+          echo "Extracted date: $created"
           echo "date=$created" >> $GITHUB_OUTPUT
 
       # 2) Optionally set a Status single-select in your Project 
