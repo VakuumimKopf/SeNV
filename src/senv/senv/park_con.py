@@ -4,7 +4,7 @@ from rclpy.node import Node
 from rclpy.action import ActionServer
 from rclpy.action.server import ServerGoalHandle
 from geometry_msgs.msg import Twist
-from senv_interfaces.msg import Pic,Laser 
+from senv_interfaces.msg import Pic, Laser
 from senv_interfaces.action import ConTask
 
 
@@ -15,10 +15,10 @@ class park_con(Node):
 
         # Parameters
         self.turned_on = False
-        
+
         # QOS Policy Setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
-                                          history=rclpy.qos.HistoryPolicy.KEEP_LAST,depth=1)
+                                          history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
 
         # Subscribing to camera and laser topics
         self.subscriber_pic = self.create_subscription(
@@ -44,36 +44,33 @@ class park_con(Node):
             self.execute_callback
         )
 
-        
-
-
     def execute_callback(self, goal_handle: ServerGoalHandle):
 
         # Get request from goal
         target = goal_handle.request.start_working
         self.get_logger().info("starting park server")
 
-        # Execute action 
+        # Execute action
         self.turned_on = target
         self.datahandler()
 
         # Final Goal State
         goal_handle.succeed()
 
-        #Result
+        # Result
         result = ConTask.Result()
         result.finished = True
         return result
 
     def pic_callback(self, msg):
-        if self.turned_on == False:
+        if self.turned_on is False:
             return
         # Process the incoming message
         self.get_logger().info('Received message pic')
         # Add driving logic here
 
     def laser_callback(self, msg):
-        if self.turned_on == False:
+        if self.turned_on is False:
             return
         # Define your callback function here
         self.get_logger().info('Received message laser')

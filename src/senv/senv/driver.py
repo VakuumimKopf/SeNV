@@ -6,22 +6,18 @@ from senv.stopper import Stopper
 from geometry_msgs.msg import Twist
 from enum import Enum
 
-class State(Enum):
-    FollowLine = 1
-    TurnOnObject = 2
-    Error = 3
 
 class Driver(rclpy.node.Node):
     def __init__(self):
         super().__init__('driver')
 
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
-                                          history=rclpy.qos.HistoryPolicy.KEEP_LAST,depth=1)
+                                          history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
 
         self.subscriber = self.create_subscription(
             Twist,  # Replace with the actual message type
             'driving',
-            self.driving_callback, 
+            self.driving_callback,
             qos_profile=qos_policy
         )
         self.subscriber  # prevent unused variable warning
@@ -32,16 +28,17 @@ class Driver(rclpy.node.Node):
         # Process the incoming message
         self.get_logger().info("Driver recieved data: " + str(msg.linear.x) + " : " + str(msg.angular.z))
 
-        # Debuga algorithm here here 
+        # Debuga algorithm here
 
         self.publisher.publish(msg)
+
 
 def main(args=None):
 
     print('Hi from Driver')
     rclpy.init(args=args, signal_handler_options=rclpy.SignalHandlerOptions.NO)
     driver_node = Driver()
-    
+
     try:
         rclpy.spin(driver_node)
 
