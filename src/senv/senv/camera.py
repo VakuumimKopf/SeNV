@@ -12,19 +12,20 @@ from senv_interfaces.msg import Pic
 class camera(Node):
     def __init__(self):
         super().__init__('camera')
+
         # set Parameters
         self.declare_parameter('boundary_left', 100)
         # 200 für 640px, 100 für 320
         self.declare_parameter('boundary_right', 630)
         # 440 für 640px, 220 für 320px
         self.declare_parameter('light_lim', 100)
+
         self.bridge = CvBridge()
         self.status = ""
+
         self.line_pos = 0
         self.hsv = np.array([])
         self.waitingforgreen = False
-        # Beispiel
-        # self.img_row = np.array([0, 64, 128, 192, 255], dtype=np.uint8)
         self.img_row = np.random.randint(0, 256, 640, dtype=np.uint8)
 
         # definition of the QoS in order to receive data despite WiFi
@@ -32,8 +33,8 @@ class camera(Node):
             reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
             history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
 
+        # False is gegen UHrzeigersinn, True is mit Uhrzeigersinn
         self.last_spin = False
-        # False == gegen UHrzeigersinn True==mit Uhrzeigersinn
 
         # create subscribers for image data with changed qos
         self.subscription = self.create_subscription(
@@ -54,10 +55,12 @@ class camera(Node):
         self.status = ""
         self.sign_timer_period = 0.5
         self.sign_timer = self.create_timer(
-            self.sign_timer_period, self.sign_detection)
+            self.sign_timer_period, self.sign_handler)
 
     # raw data formating routine
     def image_callback(self, data):
+
+        # Get needed parameters
         boundary_left = self.get_parameter('boundary_left').get_parameter_value().integer_value
         boundary_right = self.get_parameter('boundary_right').get_parameter_value().integer_value
         light_lim = self.get_parameter('light_lim').get_parameter_value().integer_value
@@ -127,14 +130,30 @@ class camera(Node):
         self.publisher_.publish(msg)
 
     # sign detection in fomated data
-    def sign_detection(self):
-        # self.get_logger().info("sign_detection gestartet")
+    def sign_handler(self):
+
+        light_status = self.light_detection()
+
+        sign_status = self.sign_detection()
+
+        if (sign_status == ""):
+            self.status = sign_status
+
+        elif (light_status == ""):
+            self.status = light_status
+
+        else:
+            self.get_logger().info("Error in camera: sign_handler: both sign and light detected")
+            self.status = ""
+
+    def light_detection(self):
+
         min_area = 30   # Minimale Fläche (z. B. Ampellicht)
         max_area = 2000
         hsv = self.hsv
-        self.status = ""
+        status = ""
         if (hsv.size == 0):
-            self.status = ""
+            status = ""
             return
         # Function for signs - string for Outputs("")
         min_area = 30  # Minimale fläche für rotes licht
@@ -148,21 +167,12 @@ class camera(Node):
         lower_green = np.array([50, 150, 50])
         upper_green = np.array([85, 255, 255])
 
+        # Red mask creation
         mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
         mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
         red_mask = cv2.bitwise_or(mask1, mask2)
-        # Optionale Rauschunterdrückung
-        '''#red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
-        #red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
 
-            # Konturen finden
-        #contours, _ = cv2.findContours(red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        for contour in contours:
-            area = cv2.contourArea(contour)
-            if area > min_area:
-                self.status = 'red light'
-                # Grüne Fläche suchen'''
-
+        # Green mask creation
         green_mask = cv2.inRange(hsv, lower_green, upper_green)
 
         # Rauschunterdrückung
@@ -193,17 +203,20 @@ class camera(Node):
 
         # Statuslogik
         if max_red_area > 0:
-            self.status = 'red light'
+            status = 'red light'
             self.waitingforgreen = True
         if max_green_area >= max_red_area and max_green_area > 0:
-            self.status = 'green light'
+            status = 'green light'
             self.waitingforgreen = False
 
         cv2.imshow("IMG_red", red_mask)
         cv2.imshow("IMG_green", green_mask)
         cv2.waitKey(1)
 
-        # Function for trafficlights - string for Output("red light", "green light")
+        return status
+
+    def sign_detection(self):
+        pass
 
 
 def main(args=None):
