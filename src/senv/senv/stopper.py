@@ -11,6 +11,7 @@ from geometry_msgs.msg import Twist
 from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge, CvBridgeError
 
+
 class Stopper(rclpy.node.Node):
     def __init__(self):
         super().__init__('stopper')
@@ -24,11 +25,13 @@ class Stopper(rclpy.node.Node):
         # send message
         self.publisher_stop.publish(msg)
 
+
 def main(args=None):
     rclpy.init(args=args)
     stop = Stopper()
     stop.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
