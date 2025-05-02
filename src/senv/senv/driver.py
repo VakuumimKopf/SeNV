@@ -14,14 +14,16 @@ class Driver(rclpy.node.Node):
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
 
+        # Topic subscription
         self.subscriber = self.create_subscription(
-            Twist,  # Replace with the actual message type
+            Twist,
             'driving',
             self.driving_callback,
             qos_profile=qos_policy
         )
         self.subscriber  # prevent unused variable warning
 
+        # Topic to publish
         self.publisher = self.create_publisher(Twist, 'cmd_vel', 1)
 
     def driving_callback(self, msg: Twist):
@@ -30,6 +32,7 @@ class Driver(rclpy.node.Node):
 
         # Debuga algorithm here
 
+        # Send final msg here
         self.publisher.publish(msg)
 
 

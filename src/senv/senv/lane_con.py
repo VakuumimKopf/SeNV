@@ -25,12 +25,15 @@ class lane_con(Node):
         self.declare_parameter('speed_turn_adjust', 0.3)
 
         # Other Parameter
-        self.min_obstacle_distance = 0.2
-        self.line_pos = 0
         self.last_spin = False  # False == gegen Uhrzeigersinn True==mit Uhrzeigersinn
-        self.obstacle_detect = False
+
+        # State Parameters of the node
         self.is_turned_on = True
         self.last_state = ""
+
+        # Last incoming msg
+        self.last_pic_msg = Pic()
+        self.last_laser_msg = Laser()
 
         # Action trigger parameter
         self.park_con_triggers = ["park_sign"]
@@ -119,10 +122,48 @@ class lane_con(Node):
     # Process the incoming message and decide whats to do --> give this information to sender
     def pic_callback(self, msg: Pic):
 
-        # Call lane_holding to get speed and turn value
-        speed, turn = self.lane_holding(msg.line)
+        self.last_pic_msg = msg
 
-        if msg.sign in self.park_con_triggers:
+    # Process incoming message and decide what to do --> give this information to sender
+    def laser_callback(self, msg: Laser):
+
+        self.last_laser_msg = msg
+
+    # Determine the current status based on inputs
+    def status_evaluation(self):
+
+        # Get most recent msg objects
+        last_pic_msg = self.last_pic_msg
+        last_laser_msg = self.last_laser_msg
+
+        # Call lane_holding to get speed and turn value
+        speed, turn = self.lane_holding(last_pic_msg.line)
+
+        if last_pic_msg.sign == "":
+
+            # do nothing special
+            # lane holding algorithm
+            self.driving_sender("drive_normal", speed, turn)
+
+            # Update state
+            self.update_node_state("drive_normal")
+            return
+
+        elif last_laser_msg.distance <= 10 and last_laser_msg.angle in range(25, -25):
+
+            self.get_logger().info("Übergeben an obstacle_con")
+
+            # send action to obstacle_con
+            self.send_goal(True, self.obstacle_client)
+
+            # stop controll
+            self.is_turned_on = False
+
+            # Update state
+            self.update_node_state("drive_around_obstacle")
+            return
+
+        elif last_pic_msg.sign in self.park_con_triggers:
 
             self.get_logger().info("Übergeben an park_con")
 
@@ -131,9 +172,12 @@ class lane_con(Node):
 
             # stop controll
             self.is_turned_on = False
+
+            # Update state
+            self.update_node_state("parking")
             return
 
-        elif msg.sign in self.intersection_con_triggers:
+        elif last_pic_msg.sign in self.intersection_con_triggers:
 
             self.get_logger().info("Übergeben an intersection_con")
 
@@ -142,37 +186,35 @@ class lane_con(Node):
 
             # stop controll
             self.is_turned_on = False
+
+            # Update state
+            self.update_node_state("driving_in_intersection")
             return
 
-        elif msg.sign == "red light":
+        elif last_pic_msg.sign == "red light":
 
             self.get_logger().info("Halten an roter Ampel")
             self.driving_sender("stop", speed, turn)
+
+            # Update state
+            self.update_node_state("waiting_on_redlight")
             return
 
-        elif msg.sign == "green light":
+        elif last_pic_msg.sign == "green light":
 
             self.get_logger().info("Weiterfahren an grüner Ampel")
             self.driving_sender("drive_normal", speed, turn)
-            return
 
-        elif msg.sign == "":
-
-            # do nothing special
-            # lane holding algorithm
-            self.driving_sender("drive_normal", speed, turn)
+            # Update state
+            self.update_node_state("driving_on_greenlight")
             return
 
         else:
             self.get_logger().info("Error in pic_callback string sign: false value")
+
+            # Update state
+            self.update_node_state("Error unkown state")
             return
-
-    # Process incoming message and decide what to do --> give this information to sender
-    def laser_callback(self, msg: Laser):
-
-        if msg.distance <= self.min_obstacle_distance and msg.distance != 0:
-            pass
-            # tell sender to stop
 
     # Determine and return turn speed to hold the lane
     def lane_holding(self, data):
@@ -181,10 +223,12 @@ class lane_con(Node):
         speed_drive = self.get_parameter('speed_drive').get_parameter_value().double_value
         speed_turn = self.get_parameter('speed_turn').get_parameter_value().double_value
         last_spin = self.last_spin
+
         middle_pix = 550  # für 320px
+        offset_scaling = 23
+
         line_pos = data
         offset = abs(line_pos-middle_pix)
-        offset_scaling = 23
 
         speed = 0.0
         turn = 0.0
@@ -224,11 +268,11 @@ class lane_con(Node):
         return speed, turn
 
     def driving_sender(self, command, speed, turn):
+
         # commands: stop, drive_normal, drive_slow, drive_fast
         msg = Twist()
-        state = String()
-        state.data = command
-        if command == "stop" or self.obstacle_detect is True:
+
+        if command == "stop":
             msg.angular.z = 0.0
             msg.linear.x = 0.0
 
@@ -241,10 +285,15 @@ class lane_con(Node):
             self.get_logger().info("drive_normal command")
         else:
             self.get_logger().info("Error lane_con: driving_sender: unkown command")
-        if self.last_state != command:
-            self.publisher_state.publish(state)
+
         self.publisher_.publish(msg)
-        self.last_state = command
+
+    # Update node state if changed
+    def update_node_state(self, state):
+
+        if state != self.last_state:
+            self.last_state == state
+            self.publisher_state.publish(String("Changed to " + state))
 
 
 def main(args=None):

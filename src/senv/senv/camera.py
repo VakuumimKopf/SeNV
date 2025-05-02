@@ -12,19 +12,20 @@ from senv_interfaces.msg import Pic
 class camera(Node):
     def __init__(self):
         super().__init__('camera')
+
         # set Parameters
         self.declare_parameter('boundary_left', 100)
         # 200 für 640px, 100 für 320
         self.declare_parameter('boundary_right', 630)
         # 440 für 640px, 220 für 320px
         self.declare_parameter('light_lim', 100)
+
         self.bridge = CvBridge()
         self.status = ""
+
         self.line_pos = 0
         self.hsv = np.array([])
         self.waitingforgreen = False
-        # Beispiel
-        # self.img_row = np.array([0, 64, 128, 192, 255], dtype=np.uint8)
         self.img_row = np.random.randint(0, 256, 640, dtype=np.uint8)
 
         # definition of the QoS in order to receive data despite WiFi
@@ -32,7 +33,7 @@ class camera(Node):
             reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
             history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
 
-        # False == gegen UHrzeigersinn True==mit Uhrzeigersinn
+        # False is gegen UHrzeigersinn, True is mit Uhrzeigersinn
         self.last_spin = False
 
         # create subscribers for image data with changed qos
@@ -58,6 +59,8 @@ class camera(Node):
 
     # raw data formating routine
     def image_callback(self, data):
+
+        # Get needed parameters
         boundary_left = self.get_parameter('boundary_left').get_parameter_value().integer_value
         boundary_right = self.get_parameter('boundary_right').get_parameter_value().integer_value
         light_lim = self.get_parameter('light_lim').get_parameter_value().integer_value
