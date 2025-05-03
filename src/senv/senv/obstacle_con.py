@@ -6,6 +6,9 @@ from rclpy.action.server import ServerGoalHandle
 from geometry_msgs.msg import Twist
 from senv_interfaces.msg import Pic, Laser
 from senv_interfaces.action import ConTask
+import time
+from std_msgs.msg import String
+from lane_con import LaneCon
 
 
 class obstacle_con(Node):
@@ -15,6 +18,10 @@ class obstacle_con(Node):
 
         # Parameters
         self.turned_on = False
+        self.state_obstacle = "Unknown"
+        self.closest_obstacle = 0.0
+        self.closest_obstacle_angle = 0.0
+        self.last_state_obstacle = "Unknown"
 
         # QOS Policy Setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
@@ -30,7 +37,7 @@ class obstacle_con(Node):
         self.subscriber_pic  # prevent unused variable warning
 
         self.subscriber_laser = self.create_subscription(
-            Laser,  # Replace with the actual message type
+            Laser,
             'laser',
             self.laser_callback,
             qos_profile=qos_policy
@@ -43,6 +50,19 @@ class obstacle_con(Node):
             "obstacle_task",
             self.execute_callback
         )
+        self.publisher_driver = self.create_publisher(
+            Twist,
+            'driver',
+            qos_profile=qos_policy
+        )
+        self.publisher_driver  # prevent unused variable warning
+
+        self.publisher_state = self.create_publisher(
+            str,
+            'state',
+            qos_profile=qos_policy
+        )
+        self.publisher_state  # prevent unused variable warning
 
     def execute_callback(self, goal_handle: ServerGoalHandle):
 
@@ -66,18 +86,87 @@ class obstacle_con(Node):
         if self.turned_on is False:
             return
         # Process the incoming message
-        self.get_logger().info('Received message pic')
+        # self.get_logger().info('Received message pic')
         # Add driving logic here
 
     def laser_callback(self, msg):
         if self.turned_on is False:
             return
         # Define your callback function here
-        self.get_logger().info('Received message laser')
+        # self.get_logger().info('Received message laser')
+        # Process the incoming message
+        self.closest_obstacle = msg.laser.distance
+        self.closest_obstacle_angle = msg.laser.angle
+
         # obstacle avoidance
+        if -90 <= self.closest_obstacle_angle < 90:
+            self.state_obstacle = "Infront"
+        elif 170 <= self.closest_obstacle_angle < 190:
+            self.state_obstacle = "Right"
+        elif self.closest_obstacle_angle >= 270 or self.closest_obstacle_angle <= - 270:
+            self.state_obstacle = "Behind"
+        elif -190 <= self.closest_obstacle_angle < -170:
+            self.state_obstacle = "Left"
+        else:
+            self.state_obstacle = "Unknown"
+        self.get_logger().info(f"Obstacle state: {self.state_obstacle}")
 
     def datahandler(self):
-        self.get_logger().info("Handling obstacle data")
+        distance_min = self.get_parameter('distance_min').get_parameter_value().double_value
+        distance_max = self.get_parameter('distance_max').get_parameter_value().double_value
+        round_count = 0
+        self.get_logger().info(f"laser_distance: {self.closest_obstacle}")
+        self.get_logger().info(f"laser angle: {self.closest_obstacle_angle}")
+
+        msg_state = String()
+        msg_state.data = "Obstacle_avoidance"
+        self.publisher_state.publish(msg_state)
+        while self.turned_on is True:
+
+            # Create a Twist message
+            msg = Twist()
+
+            # Set linear and angular velocities based on the obstacle state
+            if self.state_obstacle == "Infront":
+                msg.linear.x = 0.0
+                msg.angular.z = 0.5
+            elif self.state_obstacle == "Behind":
+                msg.linear.x = 0.0
+                msg.angular.z = -0.5
+            # elif self.state_obstacle == "Left" or round_count >= 2:
+            #     msg.linear.x = 0.5
+            #     if self.closest_obstacle < distance_min:
+            #         msg.angular.z = 0.5
+            #     elif self.closest_obstacle > distance_max:
+            #         msg.angular.z = -0.5
+            #     else:
+            #         msg.angular.z = 0.0
+            elif self.state_obstacle == "Right":
+                msg.linear.x = 0.5
+                msg.angular.z = 0.0
+                if self.closest_obstacle < distance_min:
+                    msg.angular.z = 0.5
+                elif self.closest_obstacle > distance_max:
+                    msg.angular.z = -0.5
+                else:
+                    msg.angular.z = 0.0
+                if self.last_state_obstacle != "Right":
+                    round_count += 1
+
+            else:
+                msg.linear.x = 0.0
+                msg.angular.z = 0.0
+            self.last_state_obstacle = self.state_obstacle
+            # Publish the Twist message
+            self.publisher_driver.publish(msg)
+            if round_count >= 2:
+                self.turned_on is False
+            # Sleep for a short duration to control the rate of publishing
+            time.sleep(0.1)
+
+        msg_state = String()
+        msg_state = "Obstacle_avoidance_finished"
+        self.publisher_driver.publish(msg_state)
 
 
 def main(args=None):

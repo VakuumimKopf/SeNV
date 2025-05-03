@@ -1,6 +1,7 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
 
+
 def generate_launch_description():
     return LaunchDescription([
         Node(
@@ -50,5 +51,17 @@ def generate_launch_description():
             output='screen',
             emulate_tty=True,
             arguments=[('__log_level:=debug')],
+        ),
+        Node(
+            package='senv',
+            executable='obstacle_con',
+            # activate output
+            output='screen',
+            emulate_tty=True,
+            arguments=[('__log_level:=debug')],
+            parameters=[
+                {'distance_min': 0.15},
+                {'distance_max': 0.25}
+            ],
         ),
     ])
