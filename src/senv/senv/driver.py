@@ -1,10 +1,7 @@
 import rclpy
-import rclpy.executors
 import rclpy.node
-from std_msgs.msg import Int16
 from senv.stopper import Stopper
 from geometry_msgs.msg import Twist
-from enum import Enum
 
 
 class Driver(rclpy.node.Node):
@@ -28,9 +25,10 @@ class Driver(rclpy.node.Node):
 
     def driving_callback(self, msg: Twist):
         # Process the incoming message
-        self.get_logger().info("Driver recieved data: " + str(msg.linear.x) + " : " + str(msg.angular.z))
+        self.get_logger() \
+            .info("Driver recieved data: " + str(msg.linear.x) + " : " + str(msg.angular.z))
 
-        # Debuga algorithm here
+        # Debug algorithm here
 
         # Send final msg here
         self.publisher.publish(msg)

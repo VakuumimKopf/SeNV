@@ -1,13 +1,8 @@
 import rclpy
 import rclpy.node
-import cv2
 import numpy as np
-import time
 
 from sensor_msgs.msg import LaserScan
-from geometry_msgs.msg import Twist
-from sensor_msgs.msg import CompressedImage
-from cv_bridge import CvBridge, CvBridgeError
 from senv_interfaces.msg import Laser
 
 
@@ -23,7 +18,8 @@ class laserscanner(rclpy.node.Node):
         self.declare_parameter('speed_drive', 0.15)
         self.declare_parameter('speed_turn', 0.5)
         self.declare_parameter('laser_front', 0)
-        self.declare_parameter('turn_time', 2.0)  # must ideally equal to an integer when divided by timer_period
+        self.declare_parameter('turn_time', 2.0)
+        # must ideally equal to an integer when divided by timer_period
 
         self.img_row = np.random.randint(0, 256, 640, dtype=np.uint8)
 
@@ -51,7 +47,8 @@ class laserscanner(rclpy.node.Node):
     def scanner_callback(self, msg):
 
         # saving the required sensor value, no further processing at this point
-        self.front_distance = msg.ranges[self.get_parameter('laser_front').get_parameter_value().integer_value]
+        self.front_distance = msg.ranges[self.get_parameter('laser_front')
+                                         .get_parameter_value().integer_value]
 
     # driving logics
     def timer_callback(self):

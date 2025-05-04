@@ -1,6 +1,5 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String
 from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge
 import cv2
@@ -183,8 +182,8 @@ class camera(Node):
         green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_CLOSE, kernel)
 
         # Konturen analysieren
-        contours_red, _ = cv2.findContours(red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        contours_green, _ = cv2.findContours(green_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours_red = cv2.findContours(red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours_green = cv2.findContours(green_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         max_red_area = 0
         max_green_area = 0

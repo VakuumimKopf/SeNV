@@ -1,15 +1,7 @@
 import rclpy
-import rclpy.executors
 import rclpy.node
-import cv2
-import numpy as np
 import time
-
-from std_msgs.msg import String
-from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
-from sensor_msgs.msg import CompressedImage
-from cv_bridge import CvBridge, CvBridgeError
 
 
 class Stopper(rclpy.node.Node):
