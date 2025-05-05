@@ -9,14 +9,21 @@ from geometry_msgs.msg import Twist
 from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge, CvBridgeError
 from senv_interfaces.msg import Laser
+import math 
 
 
 class laserscanner(rclpy.node.Node):
     def __init__(self):
         super().__init__('laserturn')
 
+        self.laser_distance = 0.0
+        self.right_distance = 0.0
+        self.left_distance = 0.0
+        self.back_distance = 0.0
         self.front_distance = 0.0
         self.is_turning = False
+        self.back_angle = 0
+        self.front_angle = 0
 
         # definition of the parameters that can be changed at runtime
         self.declare_parameter('distance_to_turn', 0.45)
@@ -49,17 +56,42 @@ class laserscanner(rclpy.node.Node):
 
     # handling received laser scan data
     def scanner_callback(self, msg):
+        # self.get_logger().info("laserscanner callback" + str(len(msg.ranges)))
+        min_back = 0.0
+        min_front = 0.0
 
-        # saving the required sensor value, no further processing at this point
-        self.front_distance = msg.ranges[self.get_parameter('laser_front').get_parameter_value().integer_value]
+        rounded = [round(x, 3) for x in msg.ranges]
+        # self.get_logger().info("laserscanner callback" + str(rounded))
+
+        self.left_distance = min(rounded[170:190])
+        self.right_distance = min(rounded[530:550])
+        min_back = min(rounded[270:450])
+        self.back_distance = min_back
+        self.back_angle = rounded[270:450].index(min_back)
+        min_front = min(min(rounded[0:90]), min(rounded[630:720]))
+        self.front_distance = min_front
+        if min_front == min(rounded[0:90]):
+            self.front_angle = rounded[0:90].index(min_front)
+        else:
+            self.front_angle = rounded[630:720].index(min_front)
+        # self.front_angle = rounded[0:90].index(min_front) or rounded[630:720].index(min_front)
 
     # driving logics
     def timer_callback(self):
         self.get_logger().info("laserscannercallback")
 
         msg = Laser()
-        msg.distance = self.front_distance
-        msg.angle = 0
+        msg.front_distance = self.front_distance
+        msg.back_distance = self.back_distance
+        msg.left_distance = self.left_distance
+        msg.right_distance = self.right_distance
+        msg.front_angle = self.front_angle
+        msg.back_angle = self.back_angle
+        """self.get_logger().info("front_distance: "
+          + str(self.front_distance) + " front_angle: " + str(self.front_angle))
+        self.get_logger().info("back_distance: " + str(self.back_distance) + " back_angle: " + str(self.back_angle))
+        self.get_logger().info("left_distance: " + str(self.left_distance))
+        self.get_logger().info("right_distance: " + str(self.right_distance))"""
         self.publisher_laserturn.publish(msg)
 
 

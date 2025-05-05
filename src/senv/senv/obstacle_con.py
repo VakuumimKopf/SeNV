@@ -8,7 +8,6 @@ from senv_interfaces.msg import Pic, Laser
 from senv_interfaces.action import ConTask
 import time
 from std_msgs.msg import String
-from lane_con import LaneCon
 
 
 class obstacle_con(Node):
@@ -23,6 +22,8 @@ class obstacle_con(Node):
         self.closest_obstacle_angle = 0.0
         self.last_state_obstacle = "Unknown"
 
+        self.declare_parameter('distance_min', 0.15)
+        self.declare_parameter('distance_max', 0.25)
         # QOS Policy Setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
@@ -58,7 +59,7 @@ class obstacle_con(Node):
         self.publisher_driver  # prevent unused variable warning
 
         self.publisher_state = self.create_publisher(
-            str,
+            String,
             'state',
             qos_profile=qos_policy
         )
@@ -68,7 +69,7 @@ class obstacle_con(Node):
 
         # Get request from goal
         target = goal_handle.request.start_working
-        self.get_logger().info("starting obstacle server")
+        self.get_logger().info(f"starting obstacle server {target}")
 
         # Execute action
         self.turned_on = target
@@ -95,23 +96,27 @@ class obstacle_con(Node):
         # Define your callback function here
         # self.get_logger().info('Received message laser')
         # Process the incoming message
-        self.closest_obstacle = msg.laser.distance
-        self.closest_obstacle_angle = msg.laser.angle
-
-        # obstacle avoidance
-        if -90 <= self.closest_obstacle_angle < 90:
+        self.closest_obstacle = min(msg.front_distance, msg.back_distance, msg.left_distance, msg.right_distance)
+        if self.closest_obstacle == msg.front_distance:
+            self.closest_obstacle_angle = msg.front_angle
             self.state_obstacle = "Infront"
-        elif 170 <= self.closest_obstacle_angle < 190:
-            self.state_obstacle = "Right"
-        elif self.closest_obstacle_angle >= 270 or self.closest_obstacle_angle <= - 270:
+        elif self.closest_obstacle == msg.back_distance:
+            self.closest_obstacle_angle = msg.back_angle
             self.state_obstacle = "Behind"
-        elif -190 <= self.closest_obstacle_angle < -170:
+        elif self.closest_obstacle == msg.left_distance:
+            self.closest_obstacle_angle = None
             self.state_obstacle = "Left"
+        elif self.closest_obstacle == msg.right_distance:
+            self.closest_obstacle_angle = None
+            self.state_obstacle = "Right"
         else:
+            self.closest_obstacle_angle = None
             self.state_obstacle = "Unknown"
+
         self.get_logger().info(f"Obstacle state: {self.state_obstacle}")
 
     def datahandler(self):
+
         distance_min = self.get_parameter('distance_min').get_parameter_value().double_value
         distance_max = self.get_parameter('distance_max').get_parameter_value().double_value
         round_count = 0
@@ -121,7 +126,7 @@ class obstacle_con(Node):
         msg_state = String()
         msg_state.data = "Obstacle_avoidance"
         self.publisher_state.publish(msg_state)
-        while self.turned_on is True:
+        while self.state_obstacle != "Done" and self.turned_on:
 
             # Create a Twist message
             msg = Twist()
@@ -160,13 +165,14 @@ class obstacle_con(Node):
             # Publish the Twist message
             self.publisher_driver.publish(msg)
             if round_count >= 2:
-                self.turned_on is False
+                self.state_obstacle = "Done"
+                break
             # Sleep for a short duration to control the rate of publishing
             time.sleep(0.1)
 
         msg_state = String()
         msg_state = "Obstacle_avoidance_finished"
-        self.publisher_driver.publish(msg_state)
+        self.publisher_state.publish(msg_state)
 
 
 def main(args=None):

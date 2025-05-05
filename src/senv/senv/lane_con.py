@@ -87,7 +87,7 @@ class lane_con(Node):
         # create timers for data handling
         self.line_timer_period = 0.1
         self.line_timer = self.create_timer(
-            self.line_timer_period, self.line_detection)
+            self.line_timer_period, self.status_evaluation)
 
     # region action client
 
@@ -116,6 +116,7 @@ class lane_con(Node):
     def goal_result_callback(self, future):
         result = future.result().result
         self.get_logger().info("Result:" + str(result.finished))
+        self.is_turned_on = True
 
     # endregion
 
@@ -127,11 +128,13 @@ class lane_con(Node):
     # Process incoming message and decide what to do --> give this information to sender
     def laser_callback(self, msg: Laser):
 
-        self.last_laser_msg = msg
+        self.last_laser_msg = msg.front_distance
 
     # Determine the current status based on inputs
     def status_evaluation(self):
 
+        if self.is_turned_on is False:
+            return
         # Get most recent msg objects
         last_pic_msg = self.last_pic_msg
         last_laser_msg = self.last_laser_msg
@@ -149,7 +152,7 @@ class lane_con(Node):
             self.update_node_state("drive_normal")
             return
 
-        elif last_laser_msg.distance <= 10 and last_laser_msg.angle in range(25, -25):
+        elif last_laser_msg.front_distance <= 0.25:
 
             self.get_logger().info("Übergeben an obstacle_con")
 
@@ -198,7 +201,7 @@ class lane_con(Node):
 
             # Update state
             self.update_node_state("waiting_on_redlight")
-            return
+            # return lane_holding
 
         elif last_pic_msg.sign == "green light":
 
@@ -293,7 +296,9 @@ class lane_con(Node):
 
         if state != self.last_state:
             self.last_state == state
-            self.publisher_state.publish(String("Changed to " + state))
+            out = String()
+            out.data = "Chnaged to " + str(state)
+            self.publisher_state.publish(out)
 
 
 def main(args=None):
