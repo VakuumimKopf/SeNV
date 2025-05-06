@@ -133,8 +133,10 @@ class lane_con(Node):
     # Determine the current status based on inputs
     def status_evaluation(self):
 
+        # Check if node has controll
         if self.is_turned_on is False:
             return
+
         # Get most recent msg objects
         last_pic_msg = self.last_pic_msg
         last_laser_msg = self.last_laser_msg
@@ -142,17 +144,8 @@ class lane_con(Node):
         # Call lane_holding to get speed and turn value
         speed, turn = self.lane_holding(last_pic_msg.line)
 
-        if last_pic_msg.sign == "":
-
-            # do nothing special
-            # lane holding algorithm
-            self.driving_sender("drive_normal", speed, turn)
-
-            # Update state
-            self.update_node_state("drive_normal")
-            return
-
-        elif last_laser_msg.front_distance <= 0.25:
+        # Check laser always first because this is more reliable
+        if last_laser_msg.front_distance <= 0.25:
 
             self.get_logger().info("Übergeben an obstacle_con")
 
@@ -164,6 +157,16 @@ class lane_con(Node):
 
             # Update state
             self.update_node_state("drive_around_obstacle")
+            return
+
+        elif last_pic_msg == "":
+
+            # do nothing special
+            # lane holding algorithm
+            self.driving_sender("drive_normal", speed, turn)
+
+            # Update state
+            self.update_node_state("drive_normal")
             return
 
         elif last_pic_msg.sign in self.park_con_triggers:
