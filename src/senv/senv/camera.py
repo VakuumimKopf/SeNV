@@ -148,7 +148,7 @@ class camera(Node):
 
     def light_detection(self):
 
-        min_area = 30   # Minimale Fläche (z. B. Ampellicht)
+        min_area = 50   # Minimale Fläche (z. B. Ampellicht)
         max_area = 2000
         hsv = self.hsv
         status = ""
@@ -156,7 +156,7 @@ class camera(Node):
             status = ""
             return
         # Function for signs - string for Outputs("")
-        min_area = 30  # Minimale fläche für rotes licht
+        # min_area = 30  # Minimale fläche für rotes licht
         # Farbgrenzen für rot
         lower_red1 = np.array([0, 100, 100])
         upper_red1 = np.array([10, 255, 255])

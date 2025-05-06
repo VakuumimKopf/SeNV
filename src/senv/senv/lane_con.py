@@ -33,7 +33,7 @@ class lane_con(Node):
 
         # Last incoming msg
         self.last_pic_msg = Pic()
-        self.last_laser_msg = Laser()
+        self.last_laser_msg = 0.0
 
         # Action trigger parameter
         self.park_con_triggers = ["park_sign"]
@@ -129,12 +129,18 @@ class lane_con(Node):
     def laser_callback(self, msg: Laser):
 
         self.last_laser_msg = msg.front_distance
+        # self.get_logger().info("laserscanner callback" + str(msg.front_distance))
 
     # Determine the current status based on inputs
     def status_evaluation(self):
 
         # Check if node has controll
         if self.is_turned_on is False:
+            return
+
+        # Ensure laser message is available
+        if self.last_laser_msg is None:
+            self.get_logger().info("No laser message received yet")
             return
 
         # Get most recent msg objects
@@ -145,7 +151,7 @@ class lane_con(Node):
         speed, turn = self.lane_holding(last_pic_msg.line)
 
         # Check laser always first because this is more reliable
-        if last_laser_msg.front_distance <= 0.25:
+        if last_laser_msg <= 0.5 and last_laser_msg != 0.0:
 
             self.get_logger().info("Übergeben an obstacle_con")
 
@@ -159,7 +165,7 @@ class lane_con(Node):
             self.update_node_state("drive_around_obstacle")
             return
 
-        elif last_pic_msg == "":
+        elif last_pic_msg.sign == "":
 
             # do nothing special
             # lane holding algorithm

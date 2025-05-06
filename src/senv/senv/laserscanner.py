@@ -9,7 +9,6 @@ from geometry_msgs.msg import Twist
 from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge, CvBridgeError
 from senv_interfaces.msg import Laser
-import math 
 
 
 class laserscanner(rclpy.node.Node):
@@ -48,23 +47,23 @@ class laserscanner(rclpy.node.Node):
         self.subscription  # prevent unused variable warning
 
         # create publisher for driving commands
-        self.publisher_laserturn = self.create_publisher(Laser, 'laser', 1)
+        self.publisher_laserturn = self.create_publisher(Laser, 'laser', qos_profile=qos_policy)
 
         # create timer to periodically invoke the driving logic
-        self.timer_period = 0.5  # seconds
+        self.timer_period = 0.1  # seconds
         self.my_timer = self.create_timer(self.timer_period, self.timer_callback)
 
     # handling received laser scan data
     def scanner_callback(self, msg):
         # self.get_logger().info("laserscanner callback" + str(len(msg.ranges)))
-        min_back = 0.0
-        min_front = 0.0
-
+        # min_back = 0.0
+        # min_front = 0.0
+        '''
         rounded = [round(x, 3) for x in msg.ranges]
         # self.get_logger().info("laserscanner callback" + str(rounded))
 
         self.left_distance = min(rounded[170:190])
-        self.right_distance = min(rounded[530:550])
+        self.right_distance = min(rounded[535:545])
         min_back = min(rounded[270:450])
         self.back_distance = min_back
         self.back_angle = rounded[270:450].index(min_back)
@@ -75,10 +74,15 @@ class laserscanner(rclpy.node.Node):
         else:
             self.front_angle = rounded[630:720].index(min_front)
         # self.front_angle = rounded[0:90].index(min_front) or rounded[630:720].index(min_front)
+        '''
+        self.front_distance = msg.ranges[0]
+        self.back_distance = msg.ranges[450]
+        self.left_distance = msg.ranges[630]
+        self.right_distance = msg.ranges[540]
 
     # driving logics
     def timer_callback(self):
-        self.get_logger().info("laserscannercallback")
+        # self.get_logger().info("laserscannercallback")
 
         msg = Laser()
         msg.front_distance = self.front_distance
