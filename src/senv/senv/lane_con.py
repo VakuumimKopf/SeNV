@@ -1,5 +1,6 @@
 
 import rclpy
+import time
 import numpy as np
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
@@ -115,6 +116,10 @@ class lane_con(Node):
     # Requesting Result from action server
     def goal_result_callback(self, future):
         result = future.result().result
+
+        if result.finished is True:
+            self.finish_move()
+
         self.get_logger().info("Result:" + str(result.finished))
         self.is_turned_on = True
 
@@ -308,6 +313,10 @@ class lane_con(Node):
             out = String()
             out.data = "Chnaged to " + str(state)
             self.publisher_state.publish(out)
+
+    def finish_move(self):
+        self.driving_sender("drive_normal", 0.115, 0.0)
+        time.sleep(1)
 
 
 def main(args=None):
