@@ -213,10 +213,10 @@ class camera(Node):
         cv2.imshow("IMG_green", green_mask)
         cv2.waitKey(1)
 
-        return status
+        return ""
 
     def sign_detection(self):
-        pass
+        return ""
 
 
 def main(args=None):

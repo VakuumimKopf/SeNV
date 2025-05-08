@@ -102,7 +102,7 @@ class obstacle_con(Node):
         self.get_logger().info(f"Obstacle state: {self.state_obstacle}")
 
     def datahandler(self):
-        distance_to_obstacle = self.get_parameter('distance_to_obstacle').double_value
+        distance_to_obstacle = self.get_parameter('distance_to_obstacle').get_parameter_value().double_value
         # driving logic
         if self.state_obstacle == "Infront":
 
