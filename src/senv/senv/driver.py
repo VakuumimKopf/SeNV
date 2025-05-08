@@ -28,7 +28,9 @@ class Driver(rclpy.node.Node):
 
     def driving_callback(self, msg: Twist):
         # Process the incoming message
-        self.get_logger().info("Driver recieved data: " + str(msg.linear.x) + " : " + str(msg.angular.z))
+        self.get_logger().info(
+            "Driver recieved data: " + str(msg.linear.x) + " : " + str(msg.angular.z)
+            )
 
         # Debuga algorithm here
 

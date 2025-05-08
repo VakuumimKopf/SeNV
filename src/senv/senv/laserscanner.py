@@ -1,13 +1,8 @@
 import rclpy
 import rclpy.node
-import cv2
 import numpy as np
-import time
 
 from sensor_msgs.msg import LaserScan
-from geometry_msgs.msg import Twist
-from sensor_msgs.msg import CompressedImage
-from cv_bridge import CvBridge, CvBridgeError
 from senv_interfaces.msg import Laser
 
 
@@ -15,21 +10,16 @@ class laserscanner(rclpy.node.Node):
     def __init__(self):
         super().__init__('laserturn')
 
-        self.laser_distance = 0.0
-        self.right_distance = 0.0
-        self.left_distance = 0.0
-        self.back_distance = 0.0
         self.front_distance = 0.0
-        self.is_turning = False
-        self.back_angle = 0
-        self.front_angle = 0
+        self.front_left_distance = 0.0
+        self.left_distance = 0.0
+        self.back_left_distance = 0.0
+        self.back_distance = 0.0
+        self.back_right_distance = 0.0
+        self.right_distance = 0.0
+        self.front_right_distance = 0.0
 
         # definition of the parameters that can be changed at runtime
-        self.declare_parameter('distance_to_turn', 0.45)
-        self.declare_parameter('speed_drive', 0.15)
-        self.declare_parameter('speed_turn', 0.5)
-        self.declare_parameter('laser_front', 0)
-        self.declare_parameter('turn_time', 2.0)  # must ideally equal to an integer when divided by timer_period
 
         self.img_row = np.random.randint(0, 256, 640, dtype=np.uint8)
 
@@ -76,9 +66,13 @@ class laserscanner(rclpy.node.Node):
         # self.front_angle = rounded[0:90].index(min_front) or rounded[630:720].index(min_front)
         '''
         self.front_distance = msg.ranges[0]
-        self.back_distance = msg.ranges[450]
-        self.left_distance = msg.ranges[630]
+        self.front_left_distance = msg.ranges[90]
+        self.left_distance = msg.ranges[180]
+        self.back_left_distance = msg.ranges[270]
+        self.back_distance = msg.ranges[360]
+        self.back_right_distance = msg.ranges[450]
         self.right_distance = msg.ranges[540]
+        self.front_right_distance = msg.ranges[630]
 
     # driving logics
     def timer_callback(self):
@@ -86,17 +80,15 @@ class laserscanner(rclpy.node.Node):
 
         msg = Laser()
         msg.front_distance = self.front_distance
-        msg.back_distance = self.back_distance
+        msg.front_left_distance = self.front_left_distance
         msg.left_distance = self.left_distance
+        msg.back_left_distance = self.back_left_distance
+        msg.back_distance = self.back_distance
+        msg.back_right_distance = self.back_right_distance
         msg.right_distance = self.right_distance
-        msg.front_angle = self.front_angle
-        msg.back_angle = self.back_angle
-        """self.get_logger().info("front_distance: "
-          + str(self.front_distance) + " front_angle: " + str(self.front_angle))
-        self.get_logger().info("back_distance: " + str(self.back_distance) + " back_angle: " + str(self.back_angle))
-        self.get_logger().info("left_distance: " + str(self.left_distance))
-        self.get_logger().info("right_distance: " + str(self.right_distance))"""
+        msg.front_right_distance = self.front_right_distance
         self.publisher_laserturn.publish(msg)
+        self.get_logger().debug("laserscanner : " + str(msg.right_distance))
 
 
 def main(args=None):
