@@ -1,8 +1,8 @@
 float64 front_distance 
 float64 front_left_distance
 float64 left_distance 
-float64 left_back_distance
+float64 back_left_distance
 float64 back_distance 
-float64 right_back_distance
+float64 back_right_distance
 float64 right_distance 
 float64 front_right_distance

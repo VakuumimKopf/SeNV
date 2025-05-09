@@ -19,7 +19,7 @@ class obstacle_con(Node):
         self.turned_on = False
         self.state_obstacle = "Unknown"
         self.right_distance = 0.0
-        self.declare_parameter('distance_to_obstacle', 0.4)
+        self.declare_parameter('distance_to_obstacle', 0.5)
 
         # QOS Policy Setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
@@ -97,12 +97,12 @@ class obstacle_con(Node):
 
         # Process the incoming message
         self.right_distance = msg.right_distance
+        self.get_logger().info("Right_distance callback: " + str(self.right_distance))
         if msg.front_distance <= 0.5 and msg.front_distance != 0:
             self.state_obstacle = "Infront"
         self.get_logger().info(f"Obstacle state: {self.state_obstacle}")
 
     def datahandler(self):
-        distance_to_obstacle = self.get_parameter('distance_to_obstacle').get_parameter_value().double_value
         # driving logic
         if self.state_obstacle == "Infront":
 
@@ -115,19 +115,19 @@ class obstacle_con(Node):
             self.turn90(-1.0)
             self.get_logger().info("Second Turn done")
 
-            self.drive_length(2.5)
-
+            self.drive_length(1)
+            self.get_logger().info("right_distance: " + str(self.right_distance))
             if self.right_distance == "inf":
                 self.right_distance = 0.0
 
-            self.get_logger().debug("Right_distance: " + str(self.right_distance))
+            self.get_logger().info("Right_distance: " + str(self.right_distance))
 
-            while self.right_distance >= distance_to_obstacle:
+            """while self.right_distance >= distance_to_obstacle:
                 self.get_logger().debug("Right_distance: " + str(self.right_distance))
-                time.sleep(0.1)
+                time.sleep(0.1)"""
 
-            while self.right_distance < distance_to_obstacle:
-                self.drive_along(1, distance_to_obstacle)
+            while self.right_distance < 0.6:
+                self.drive_along(self)
                 self.get_logger().info("Driving along obstacle")
                 time.sleep(1)
 
@@ -170,7 +170,8 @@ class obstacle_con(Node):
         self.get_logger().info("Drove length")
         # Sleep for a short duration to control the rate of publishing
 
-    def drive_along(self, distance_to_obstacle):
+    def drive_along(self):
+        distance_to_obstacle = self.get_parameter('distance_to_obstacle').get_parameter_value().double_value
         # keeping self.right_distance at 0.3 while driving along the obstacle
         # Create a Twist message
         msg = Twist()

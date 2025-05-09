@@ -88,7 +88,7 @@ class laserscanner(rclpy.node.Node):
         msg.right_distance = self.right_distance
         msg.front_right_distance = self.front_right_distance
         self.publisher_laserturn.publish(msg)
-        self.get_logger().debug("laserscanner : " + str(msg.right_distance))
+        self.get_logger().info("laserscanner : " + str(msg.right_distance))
 
 
 def main(args=None):
