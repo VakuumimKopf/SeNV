@@ -9,8 +9,30 @@ from rclpy.action.client import ClientGoalHandle
 from senv_interfaces.msg import Pic, Laser
 from senv_interfaces.action import ConTask
 from std_msgs.msg import String
+from rcl_interfaces.msg import ParameterDescriptor, ParameterType, IntegerRange, FloatingPointRange
+from senv.stopper import Stopper
 
-
+def light_int_desc(desc):
+    min_val=0 
+    max_val=255 
+    step=1
+    return ParameterDescriptor(type= ParameterType.PARAMETER_INTEGER, description=desc, 
+                                integer_range=[IntegerRange(from_value=min_val, to_value=max_val, step=step)])
+def int_desc(desc):
+    min_val=0
+    max_val=1000
+    step=1
+    return ParameterDescriptor(type= ParameterType.PARAMETER_INTEGER, description=desc, 
+                                integer_range=[IntegerRange(from_value=min_val, to_value=max_val, step=step)])
+def float_desc(desc):
+    min_val=0.0
+    max_val=2.0
+    step=0.001
+    return ParameterDescriptor(type= ParameterType.PARAMETER_DOUBLE, description=desc, 
+                                floating_point_range=[FloatingPointRange(from_value=min_val, to_value=max_val, step=step)])
+def bool_desc(desc):
+    return ParameterDescriptor(type=ParameterType.PARAMETER_BOOL, description = desc)
+    
 class lane_con(Node):
     def __init__(self):
         super().__init__('lane_con')
@@ -19,11 +41,12 @@ class lane_con(Node):
         # Lane Holding Parameter
         self.declare_parameter('boundary_left', 100)  # 200 für 640px, 100 für 320
         self.declare_parameter('boundary_right', 630)  # 440 für 640px, 220 für 320px
-        self.declare_parameter('speed_drive', 0.115)
-        self.declare_parameter('speed_turn', 0.3)
-        self.declare_parameter('light_lim', 100)
-        self.declare_parameter('middle_tol', 20)
-        self.declare_parameter('speed_turn_adjust', 0.3)
+        self.declare_parameter('speed_drive', 0.115, float_desc('Fahr Geschwindigkeit Lane_Con'))
+        self.declare_parameter('speed_turn', 0.3, float_desc("Drehgeschwindigkeit Lane_Con"))
+        self.declare_parameter('light_lim', 100, light_int_desc("Helligkeits Grenzwert"))
+        self.declare_parameter('middle_pix', 550, int_desc("Ausrichtungs Faktor (gering links hoch, rechts Maximal Kamera Auflösung)"))
+        self.declare_parameter('offset_scale', 23, int_desc("Offset Scaling"))
+       
 
         # Other Parameter
         self.last_spin = False  # False == gegen Uhrzeigersinn True==mit Uhrzeigersinn
@@ -239,10 +262,12 @@ class lane_con(Node):
         # Get needed parameters
         speed_drive = self.get_parameter('speed_drive').get_parameter_value().double_value
         speed_turn = self.get_parameter('speed_turn').get_parameter_value().double_value
+        middle_pix = self.get_parameter('middle_pix').get_parameter_value().integer_value
+        offset_scaling = self.get_parameter('offset_scale').get_parameter_value().integer_value
         last_spin = self.last_spin
 
-        middle_pix = 550  # für 320px
-        offset_scaling = 23
+        #middle_pix = 550  # für 320px
+        #offset_scaling = 23
 
         line_pos = data
         offset = abs(line_pos-middle_pix)
@@ -311,7 +336,7 @@ class lane_con(Node):
         if state != self.last_state:
             self.last_state == state
             out = String()
-            out.data = "Chnaged to " + str(state)
+            out.data = "Changed to " + str(state)
             self.publisher_state.publish(out)
 
     def finish_move(self):
@@ -322,20 +347,19 @@ class lane_con(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = lane_con()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
-
+    
     try:
         rclpy.spin(node)
 
     except KeyboardInterrupt:
-        print('Except in lane_con')
         node.destroy_node()
 
     finally:
-        print('Shutting Down lane_con')
-
-
+        #stop = Stopper()
+        node.destroy_node()
+        #stop.destroy_node()
+        #rclpy.shutdown()
+        print('Shutting Down Lane_con')
+    
 if __name__ == '__main__':
     main()
