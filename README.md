@@ -1,4 +1,7 @@
-# SeNV (Situationsevaluierendes Navigations Vehicle)
+
+
+
+![Titel Bild SeNV](.img/TitelBild.jpeg)
 
 ### Weitere Informationen stehen im [Github Wiki](https://github.com/VakuumimKopf/SeNV.wiki.git)
 
