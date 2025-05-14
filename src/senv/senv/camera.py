@@ -5,30 +5,9 @@ from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
-from senv.stopper import Stopper
 from senv_interfaces.msg import Pic
-from rcl_interfaces.msg import ParameterDescriptor, ParameterType, IntegerRange, FloatingPointRange
+from senv.description import float_desc, int_desc, bool_desc, light_int_desc
 
-def light_int_desc(desc):
-    min_val=0 
-    max_val=255 
-    step=1
-    return ParameterDescriptor(type= ParameterType.PARAMETER_INTEGER, description=desc, 
-                                integer_range=[IntegerRange(from_value=min_val, to_value=max_val, step=step)])
-def int_desc(desc):
-    min_val=0
-    max_val=1000
-    step=1
-    return ParameterDescriptor(type= ParameterType.PARAMETER_INTEGER, description=desc, 
-                                integer_range=[IntegerRange(from_value=min_val, to_value=max_val, step=step)])
-def float_desc(desc):
-    min_val=0.0
-    max_val=2.0
-    step=0.001
-    return ParameterDescriptor(type= ParameterType.PARAMETER_DOUBLE, description=desc, 
-                                floating_point_range=[FloatingPointRange(from_value=min_val, to_value=max_val, step=step)])
-def bool_desc(desc):
-    return ParameterDescriptor(type=ParameterType.PARAMETER_BOOL, description = desc)
 
 class camera(Node):
     def __init__(self):
@@ -41,25 +20,28 @@ class camera(Node):
         # 440 für 640px, 220 für 320px
         self.declare_parameter('light_lim', 100, float_desc("Lichtintensität Grenzwert"))
         self.declare_parameter('min_area', 50, int_desc("Minimale Fläche für Ampelerkennung"))
-        self.declare_parameter('max_area', 300,int_desc("Maximale Fläche für Ampelerkennung"))
-        #Dynmaische Paramter für RotFarbgrenzen 1
-        self.declare_parameter('low1red_color', 0,light_int_desc("Rot Farbwert Untere Grenze 1"))
-        self.declare_parameter('low1red_sat', 100,light_int_desc("Rot Saturation Untere Grenze 1"))
-        self.declare_parameter('low1red_alpha', 100,light_int_desc("Rot Helligkeit Untere Grenze 1"))
+        self.declare_parameter('max_area', 300, int_desc("Maximale Fläche für Ampelerkennung"))
+        # Dynmaische Paramter für RotFarbgrenzen 1
+        self.declare_parameter('low1red_color', 0, light_int_desc("Rot Farbwert Untere Grenze 1"))
+        self.declare_parameter('low1red_sat', 100, light_int_desc("Rot Saturation Untere Grenze 1"))
+        self.declare_parameter('low1red_alpha', 100, light_int_desc("Rot Helligkeit Untere Grenze 1"
+                                                                    ))
         self.declare_parameter('up1red_color', 10, light_int_desc("Rot Farbwert Obere Grenze 1"))
         self.declare_parameter('up1red_sat', 255, light_int_desc("Rot Saturation Obere Grenze 1"))
         self.declare_parameter('up1red_alpha', 255, light_int_desc("Rot Helligkeit Obere Grenze 1"))
-        #Dynmaische Paramter für RotFarbgrenzen 2
+        # Dynmaische Paramter für RotFarbgrenzen 2
         self.declare_parameter('low2red_color', 160, light_int_desc("Rot Farbwert Untere Grenze 2"))
         self.declare_parameter('low2red_sat', 100, light_int_desc("Rot Saturation Untere Grenze 2"))
-        self.declare_parameter('low2red_alpha', 100, light_int_desc("Rot Helligkeit Untere Grenze 2"))
+        self.declare_parameter('low2red_alpha', 100, light_int_desc("Rot Helligkeit Untere Grenze 2"
+                                                                    ))
         self.declare_parameter('up2red_color', 179, light_int_desc("Rot Farbwert Obere Grenze 2"))
         self.declare_parameter('up2red_sat', 255, light_int_desc("Rot Saturation Obere Grenze 2"))
         self.declare_parameter('up2red_alpha', 255, light_int_desc("Rot Helligkeit Obere Grenze 2"))
-        #Dynmaische Paramter für Grüne Farbgrenzen
+        # Dynmaische Paramter für Grüne Farbgrenzen
         self.declare_parameter('lowgreen_color', 50, light_int_desc("Grün Farbwert Untere Grenze"))
         self.declare_parameter('lowgreen_sat', 150, light_int_desc("Grün Saturation Untere Grenze"))
-        self.declare_parameter('lowgreen_alpha', 50, light_int_desc("Grün Helligkeit Untere Grenze"))
+        self.declare_parameter('lowgreen_alpha', 50, light_int_desc("Grün Helligkeit Untere Grenze"
+                                                                    ))
         self.declare_parameter('upgreen_color', 85, light_int_desc("Grün Farbwert Obere Grenze"))
         self.declare_parameter('upgreen_sat', 255, light_int_desc("Grün Saturation Obere Grenze"))
         self.declare_parameter('upgreen_alpha', 255, light_int_desc("Grün Helligkeit Obere Grenze"))
@@ -191,7 +173,6 @@ class camera(Node):
             self.status = ""
 
     def light_detection(self):
-        
         min_area = self.get_parameter('min_area').get_parameter_value().integer_value
         max_area = self.get_parameter('max_area').get_parameter_value().integer_value
         low1red_color = self.get_parameter('low1red_color').get_parameter_value().integer_value
@@ -215,7 +196,7 @@ class camera(Node):
         upgreen_sat = self.get_parameter('upgreen_sat').get_parameter_value().integer_value
         upgreen_alpha = self.get_parameter('upgreen_alpha').get_parameter_value().integer_value
 
-           # Minimale Fläche (z. B. Ampellicht)
+        # Minimale Fläche (z. B. Ampellicht)
         hsv = self.hsv
         status = ""
         if (hsv.size == 0):
@@ -274,7 +255,7 @@ class camera(Node):
         if max_green_area >= max_red_area and max_green_area > 0:
             status = 'green light'
             self.waitingforgreen = False
-
+        self.status = status
         cv2.imshow("IMG_red", red_mask)
         cv2.imshow("IMG_green", green_mask)
         cv2.waitKey(1)
@@ -295,12 +276,9 @@ def main(args=None):
         node.destroy_node()
 
     finally:
-        #stop = Stopper()
         node.destroy_node()
-        #stop.destroy_node()
-        #rclpy.shutdown()
         print('Shutting Down Camera')
-    
+
 
 if __name__ == '__main__':
 

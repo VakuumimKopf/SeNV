@@ -6,24 +6,10 @@ from rclpy.action.server import ServerGoalHandle
 from geometry_msgs.msg import Twist
 from senv_interfaces.msg import Pic, Laser
 from senv_interfaces.action import ConTask
-from rcl_interfaces.msg import ParameterDescriptor, ParameterType, IntegerRange, FloatingPointRange
+from senv.description import float_desc, int_desc, bool_desc, light_int_desc
+
 
 class park_con(Node):
-    def int_desc(desc):
-        min_val=0
-        max_val=255
-        step=1
-        return ParameterDescriptor(type= ParameterType.PARAMETER_INTEGER, description=desc, 
-                                   integer_range=[IntegerRange(from_value=min_val, to_value=max_val, step=step)])
-    def float_desc(desc):
-        min_val=0.0 
-        max_val=2.0
-        step=0.001
-        return ParameterDescriptor(type= ParameterType.PARAMETER_DOUBLE, description=desc, 
-                                   floating_point_range=[FloatingPointRange(from_value=min_val, to_value=max_val, step=step)])
-    def bool_desc(desc):
-        return ParameterDescriptor(type=ParameterType.PARAMETER_BOOL, description = desc)
-    
     def __init__(self):
         super().__init__('park_con')
         self.get_logger().info('park_con node has been started.')
@@ -106,10 +92,7 @@ def main(args=None):
         node.destroy_node()
 
     finally:
-        #stop = Stopper()
         node.destroy_node()
-        #stop.destroy_node()
-        #rclpy.shutdown()
         print('Shutting Down Park_Con')
 
 
