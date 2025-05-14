@@ -1,11 +1,34 @@
 import rclpy
 import rclpy.node
 import numpy as np
-
+from senv.stopper import Stopper
+from std_msgs.msg import String
 from sensor_msgs.msg import LaserScan
 from senv_interfaces.msg import Laser
+from rcl_interfaces.msg import ParameterDescriptor, ParameterType, IntegerRange, FloatingPointRange
 
+def light_int_desc(desc):
+    min_val=0 
+    max_val=255 
+    step=1
+    return ParameterDescriptor(type= ParameterType.PARAMETER_INTEGER, description=desc, 
+                                integer_range=[IntegerRange(from_value=min_val, to_value=max_val, step=step)])
+def int_desc(desc):
+    min_val=0
+    max_val=1000
+    step=1
+    return ParameterDescriptor(type= ParameterType.PARAMETER_INTEGER, description=desc, 
+                                integer_range=[IntegerRange(from_value=min_val, to_value=max_val, step=step)])
+def float_desc(desc):
+    min_val=0.0
+    max_val=2.0
+    step=0.001
+    return ParameterDescriptor(type= ParameterType.PARAMETER_DOUBLE, description=desc, 
+                                floating_point_range=[FloatingPointRange(from_value=min_val, to_value=max_val, step=step)])
+def bool_desc(desc):
+    return ParameterDescriptor(type=ParameterType.PARAMETER_BOOL, description = desc)
 
+    
 class laserscanner(rclpy.node.Node):
     def __init__(self):
         super().__init__('laserturn')
@@ -82,9 +105,9 @@ class laserscanner(rclpy.node.Node):
         msg.front_distance = self.front_distance
         msg.front_left_distance = self.front_left_distance
         msg.left_distance = self.left_distance
-        msg.back_left_distance = self.back_left_distance
+        msg.left_back_distance = self.back_left_distance
         msg.back_distance = self.back_distance
-        msg.back_right_distance = self.back_right_distance
+        msg.right_back_distance = self.back_right_distance
         msg.right_distance = self.right_distance
         msg.front_right_distance = self.front_right_distance
         self.publisher_laserturn.publish(msg)
@@ -99,11 +122,16 @@ def main(args=None):
         rclpy.spin(node)
 
     except KeyboardInterrupt:
-        print('Except in laserscanner')
+
+        node.destroy_node()
 
     finally:
+        #stop = Stopper()
         node.destroy_node()
-        print('shutting down laserscanner node')
+        #stop.destroy_node()
+        #rclpy.shutdown()
+        print('Shutting Down LaserScanner')
+
 
 
 if __name__ == '__main__':
