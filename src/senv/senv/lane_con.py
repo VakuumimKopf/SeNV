@@ -12,27 +12,38 @@ from std_msgs.msg import String
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType, IntegerRange, FloatingPointRange
 from senv.stopper import Stopper
 
+
 def light_int_desc(desc):
-    min_val=0 
-    max_val=255 
-    step=1
-    return ParameterDescriptor(type= ParameterType.PARAMETER_INTEGER, description=desc, 
-                                integer_range=[IntegerRange(from_value=min_val, to_value=max_val, step=step)])
+    min_val = 0
+    max_val = 255
+    step = 1
+    return ParameterDescriptor(
+        type=ParameterType.PARAMETER_INTEGER, description=desc, integer_range=[
+                                    IntegerRange(from_value=min_val, to_value=max_val, step=step)])
+
+
 def int_desc(desc):
-    min_val=0
-    max_val=1000
-    step=1
-    return ParameterDescriptor(type= ParameterType.PARAMETER_INTEGER, description=desc, 
-                                integer_range=[IntegerRange(from_value=min_val, to_value=max_val, step=step)])
+    min_val = 0
+    max_val = 1000
+    step = 1
+    return ParameterDescriptor(
+        type=ParameterType.PARAMETER_INTEGER, description=desc, integer_range=[
+            IntegerRange(from_value=min_val, to_value=max_val, step=step)])
+
+
 def float_desc(desc):
-    min_val=0.0
-    max_val=2.0
-    step=0.001
-    return ParameterDescriptor(type= ParameterType.PARAMETER_DOUBLE, description=desc, 
-                                floating_point_range=[FloatingPointRange(from_value=min_val, to_value=max_val, step=step)])
+    min_val = 0.0
+    max_val = 2.0
+    step = 0.001
+    return ParameterDescriptor(
+        type=ParameterType.PARAMETER_DOUBLE, description=desc, floating_point_range=[
+            FloatingPointRange(from_value=min_val, to_value=max_val, step=step)])
+
+
 def bool_desc(desc):
-    return ParameterDescriptor(type=ParameterType.PARAMETER_BOOL, description = desc)
-    
+    return ParameterDescriptor(type=ParameterType.PARAMETER_BOOL, description=desc)
+
+
 class lane_con(Node):
     def __init__(self):
         super().__init__('lane_con')
@@ -46,7 +57,6 @@ class lane_con(Node):
         self.declare_parameter('light_lim', 100, light_int_desc("Helligkeits Grenzwert"))
         self.declare_parameter('middle_pix', 550, int_desc("Ausrichtungs Faktor (gering links hoch, rechts Maximal Kamera Auflösung)"))
         self.declare_parameter('offset_scale', 23, int_desc("Offset Scaling"))
-       
 
         # Other Parameter
         self.last_spin = False  # False == gegen Uhrzeigersinn True==mit Uhrzeigersinn
@@ -266,8 +276,8 @@ class lane_con(Node):
         offset_scaling = self.get_parameter('offset_scale').get_parameter_value().integer_value
         last_spin = self.last_spin
 
-        #middle_pix = 550  # für 320px
-        #offset_scaling = 23
+        # middle_pix = 550  # für 320px
+        # offset_scaling = 23
 
         line_pos = data
         offset = abs(line_pos-middle_pix)
@@ -347,7 +357,7 @@ class lane_con(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = lane_con()
-    
+
     try:
         rclpy.spin(node)
 
@@ -355,11 +365,12 @@ def main(args=None):
         node.destroy_node()
 
     finally:
-        #stop = Stopper()
+        # stop = Stopper()
         node.destroy_node()
-        #stop.destroy_node()
-        #rclpy.shutdown()
+        # stop.destroy_node()
+        # rclpy.shutdown()
         print('Shutting Down Lane_con')
-    
+
+
 if __name__ == '__main__':
     main()
