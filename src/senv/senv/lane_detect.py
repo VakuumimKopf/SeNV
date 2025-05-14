@@ -65,7 +65,7 @@ class lane_detect(Node):
     def lane_detection(self):
 
         #  Parameter
-        number_parts = 3
+        number_parts = 5
 
         #  copy current version of self.edges and self.raw_image
         edges = copy(self.edges)
@@ -85,6 +85,7 @@ class lane_detect(Node):
         num = 0
         for region in regions:
 
+            self.get_logger().info(str(num))
             #  Appling hough transform returning set of found lines
             hough = self.hough_transform(region, raw_image, num)
 
@@ -157,7 +158,7 @@ class lane_detect(Node):
         #  Parameters
         rho = 1
         theta = np.pi/180
-        threshold = 20
+        threshold = 10
         minLineLength = 10
         maxLineGap = 50
 
@@ -212,11 +213,11 @@ class lane_detect(Node):
                 if x1 == x2:
                     continue
 
-                # Calculating weigth dependent of the distance to the middle 
-                weigth = abs(((x1 + x2) / 2) - middle) / middle
-
                 # Calculating slope of a line
                 slope = (y2 - y1) / (x2 - x1)
+
+                # Calculating weigth dependent of the distance to the middle
+                weigth = 1 - (abs(((x1 + x2) / 2) - middle) / middle)
 
                 # Calculating intercept of a line
                 intercept = y1 - (slope * x1)
