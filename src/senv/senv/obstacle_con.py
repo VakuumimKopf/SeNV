@@ -7,36 +7,17 @@ from senv_interfaces.action import ConTask
 import time
 from senv.stopper import Stopper
 from std_msgs.msg import String
-from rcl_interfaces.msg import ParameterDescriptor, ParameterType, IntegerRange, FloatingPointRange
-def light_int_desc(desc):
-    min_val=0 
-    max_val=255 
-    step=1
-    return ParameterDescriptor(type= ParameterType.PARAMETER_INTEGER, description=desc, 
-                                integer_range=[IntegerRange(from_value=min_val, to_value=max_val, step=step)])
-def int_desc(desc):
-    min_val=0
-    max_val=1000
-    step=1
-    return ParameterDescriptor(type= ParameterType.PARAMETER_INTEGER, description=desc, 
-                                integer_range=[IntegerRange(from_value=min_val, to_value=max_val, step=step)])
-def float_desc(desc):
-    min_val=0.0
-    max_val=2.0
-    step=0.001
-    return ParameterDescriptor(type= ParameterType.PARAMETER_DOUBLE, description=desc, 
-                                floating_point_range=[FloatingPointRange(from_value=min_val, to_value=max_val, step=step)])
-def bool_desc(desc):
-    return ParameterDescriptor(type=ParameterType.PARAMETER_BOOL, description = desc)
+from senv.description import float_desc, int_desc, light_int_desc, bool_desc
+
 
 class obstacle_con(Node):
     def __init__(self):
         super().__init__('obstacle_con')
         self.get_logger().info("Obstacle avoidance node started")
-
         # Parameters
-        self.declare_parameter('distance_to_obstacle', 0.4, float_desc("Gewünschter Abstand zum Objekt"))
-        
+        self.declare_parameter('distance_to_obstacle', 0.4, float_desc(
+            "Gewünschter Abstand zum Objekt"))
+
         self.turned_on = False
         self.state_obstacle = "Unknown"
         self.right_distance = 0.0
@@ -143,7 +124,8 @@ class obstacle_con(Node):
         self.get_logger().info("Drove length")
 
     def drive_along(self):
-        distance_to_obstacle = self.get_parameter('distance_to_obstacle').get_parameter_value().double_value
+        distance_to_obstacle = self.get_parameter(
+            'distance_to_obstacle').get_parameter_value().double_value
         msg = Twist()
         msg.linear.x = 0.1
 
@@ -182,11 +164,9 @@ def main(args=None):
         node.destroy_node()
 
     finally:
-        #stop = Stopper()
         node.destroy_node()
-        #stop.destroy_node()
-        #rclpy.shutdown()
         print('Shutting Down Obstacle_con')
+
 
 if __name__ == '__main__':
     main()
