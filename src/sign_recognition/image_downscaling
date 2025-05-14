@@ -1,0 +1,38 @@
+import cv2
+import os
+from skimage.io import imread
+from skimage.transform import resize
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score
+input_dir = '-.-'  # Path to the directory containing the images
+categories = ['left', 'right', 'straight', 'crosswalk', 'park']
+
+data = []
+labels = []
+
+for category_id, category in enumerate(categories):
+    for files in os.listdir(os.path.join(input_dir, category)):
+        img_path = os.path.join(input_dir, category, files)
+        img = imread(img_path)
+        img = imread(img_path)
+
+        width, height = img.shape[1], img.shape[0]
+        # print(f"width: {width}, height: {height}")
+        # Berechne Ausschnitt: obere Bildhälfte -> Höhe 0 bis height//2
+        # rechtes Drittel -> Breite 2*width//3 bis width
+        x_start = width * 2//3 - 20
+        x_end = width
+        y_start = height // 8 + 30
+        y_end = height // 2
+
+        img = img[y_start:y_end, x_start:x_end]
+        # cv2.imshow('cropped', img)
+        # cv2.waitKey(0)
+        # save the image
+        category_new = category + '_cropped'
+        if not os.path.exists(os.path.join(input_dir, category_new)):
+            os.makedirs(os.path.join(input_dir, category_new))
+        cv2.imwrite(os.path.join(input_dir, category_new, files), img)
