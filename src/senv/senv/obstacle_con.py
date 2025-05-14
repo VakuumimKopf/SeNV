@@ -16,7 +16,7 @@ class obstacle_con(Node):
         self.turned_on = False
         self.state_obstacle = "Unknown"
         self.right_distance = 0.0
-        self.declare_parameter('distance_to_obstacle', 0.2
+        self.declare_parameter('distance_to_obstacle', 0.6
                                )
 
         # QOS Policy Setting
@@ -58,6 +58,8 @@ class obstacle_con(Node):
             return
 
         self.right_distance = msg.right_distance
+        if self.right_distance == "inf":
+            self.right_distance = 0.0
         if msg.front_distance <= 0.5 and msg.front_distance != 0:
             self.state_obstacle = "Infront"
 
@@ -68,7 +70,7 @@ class obstacle_con(Node):
             self.turn90(1.0, 3)
             self.drive_length(2)
             self.turn90(-1.0, 3)
-            self.drive_length(2.0)
+            self.drive_length(0)
             while self.right_distance > 0.6:
                 self.get_logger().info("waiting till obstacle is right of me")
                 self.wait_ros2(0.1)
@@ -80,7 +82,12 @@ class obstacle_con(Node):
 
             self.drive_length(0.3)
             self.turn90(-1.0, 3)
-            self.drive_length(1.75)
+            if self.right_distance > 0.8:
+                self.drive_length(0.2)
+            while self.right_distance > 0.8:
+                # self.get_logger().info("waiting till obstacle is right of me")
+                self.wait_ros2(0)
+
             self.turn90(1.0, 3)
             self.get_logger().info("Obstacle avoidance finished")
 
@@ -99,28 +106,40 @@ class obstacle_con(Node):
 
     def drive_length(self, duration):
         msg = Twist()
+
         msg.linear.x = 0.175
         msg.angular.z = 0.0
         self.publisher_driver.publish(msg)
-
-        # ROS 2-kompatibles Warten
         self.wait_ros2(duration)
 
-        msg.linear.x = 0.0
-        self.publisher_driver.publish(msg)
+        # ROS 2-kompatibles Warten
+
+        # msg.linear.x = 0.0
+        # self.publisher_driver.publish(msg)
         self.get_logger().info("Drove length")
 
     def drive_along(self):
         distance_to_obstacle = self.get_parameter('distance_to_obstacle').get_parameter_value().double_value
         msg = Twist()
-        msg.linear.x = 0.175
+        msg.linear.x = 0.1
 
         if self.right_distance < distance_to_obstacle:
-            msg.angular.z = - 0.15
+            msg.angular.z = 0.25
         else:
-            msg.angular.z = 0.15
+            msg.angular.z = - 0.25
 
         self.publisher_driver.publish(msg)
+
+    def back_turn90(self):
+        msg = Twist()
+        while self.right_distance < 0.8:
+            msg.linear.x = 0.0
+            msg.angular.z = 0.2
+            self.publisher_driver.publish(msg)
+
+        msg.angular.z = 0.0
+        self.publisher_driver.publish(msg)
+        self.get_logger().info("Back turn 90 degrees")
 
     def wait_ros2(self, duration):
         """ROS 2-kompatibles Warten, ohne Callbacks zu blockieren."""
