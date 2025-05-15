@@ -52,4 +52,15 @@ def generate_launch_description():
             emulate_tty=True,
             arguments=[('__log_level:=debug')],
         ),
+        Node(
+            package='senv',
+            executable='obstacle_con',
+            # activate output
+            output='screen',
+            emulate_tty=True,
+            arguments=[('__log_level:=debug')],
+            parameters=[
+                {'distance_min': 0.5},
+            ],
+        ),
     ])

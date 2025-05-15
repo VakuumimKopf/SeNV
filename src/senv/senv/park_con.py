@@ -4,6 +4,7 @@ from rclpy.action import ActionServer
 from rclpy.action.server import ServerGoalHandle
 from senv_interfaces.msg import Pic, Laser
 from senv_interfaces.action import ConTask
+from senv.description import float_desc, int_desc, bool_desc, light_int_desc
 
 
 class park_con(Node):
@@ -81,9 +82,16 @@ class park_con(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = park_con()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+
+    except KeyboardInterrupt:
+
+        node.destroy_node()
+
+    finally:
+        node.destroy_node()
+        print('Shutting Down Park_Con')
 
 
 if __name__ == '__main__':
