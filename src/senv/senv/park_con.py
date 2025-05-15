@@ -1,9 +1,7 @@
 import rclpy
-import rclpy.action
 from rclpy.node import Node
 from rclpy.action import ActionServer
 from rclpy.action.server import ServerGoalHandle
-from geometry_msgs.msg import Twist
 from senv_interfaces.msg import Pic, Laser
 from senv_interfaces.action import ConTask
 from senv.description import float_desc, int_desc, bool_desc, light_int_desc
