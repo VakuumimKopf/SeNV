@@ -13,7 +13,7 @@
         "/opt/ros/humble/local/lib/python3.10/dist-packages"
     ],
     "flake8.args": [
-    "--max-line-length=120",
+    "--max-line-length=100",
     "--extend-ignore=F401",
     ],
 }

@@ -1,5 +1,7 @@
 
 import rclpy
+import time
+import numpy as np
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from rclpy.action import ActionClient
@@ -7,6 +9,8 @@ from rclpy.action.client import ClientGoalHandle
 from senv_interfaces.msg import Pic, Laser
 from senv_interfaces.action import ConTask
 from std_msgs.msg import String
+from senv.stopper import Stopper
+from senv.description import float_desc, int_desc, bool_desc, light_int_desc
 
 
 class lane_con(Node):
@@ -17,12 +21,12 @@ class lane_con(Node):
         # Lane Holding Parameter
         self.declare_parameter('boundary_left', 100)  # 200 für 640px, 100 für 320
         self.declare_parameter('boundary_right', 630)  # 440 für 640px, 220 für 320px
-        self.declare_parameter('speed_drive', 0.115)
-        self.declare_parameter('speed_turn', 0.3)
-        self.declare_parameter('light_lim', 100)
-        self.declare_parameter('middle_tol', 20)
-        self.declare_parameter('speed_turn_adjust', 0.3)
-
+        self.declare_parameter('speed_drive', 0.115, float_desc('Fahr Geschwindigkeit Lane_Con'))
+        self.declare_parameter('speed_turn', 0.3, float_desc("Drehgeschwindigkeit Lane_Con"))
+        self.declare_parameter('light_lim', 100, light_int_desc("Helligkeits Grenzwert"))
+        self.declare_parameter('middle_pix', 550, int_desc("Ausrichtungs Faktor (gering links hoch,"
+                                                           "rechts Maximal Kamera Auflösung)"))
+        self.declare_parameter('offset_scale', 23, int_desc("Offset Scaling"))
         # Other Parameter
         self.last_spin = False  # False == gegen Uhrzeigersinn True==mit Uhrzeigersinn
 
@@ -32,8 +36,7 @@ class lane_con(Node):
 
         # Last incoming msg
         self.last_pic_msg = Pic()
-        self.last_laser_msg = Laser()
-
+        self.last_laser_msg = 0.0
         # Action trigger parameter
         self.park_con_triggers = ["park_sign"]
         self.intersection_con_triggers = ["intersection_sign_left", "intersection_sign_right",
@@ -86,7 +89,7 @@ class lane_con(Node):
         # create timers for data handling
         self.line_timer_period = 0.1
         self.line_timer = self.create_timer(
-            self.line_timer_period, self.line_detection)
+            self.line_timer_period, self.status_evaluation)
 
     # region action client
 
@@ -114,7 +117,12 @@ class lane_con(Node):
     # Requesting Result from action server
     def goal_result_callback(self, future):
         result = future.result().result
+
+        if result.finished is True:
+            self.finish_move()
+
         self.get_logger().info("Result:" + str(result.finished))
+        self.is_turned_on = True
 
     # endregion
 
@@ -126,10 +134,20 @@ class lane_con(Node):
     # Process incoming message and decide what to do --> give this information to sender
     def laser_callback(self, msg: Laser):
 
-        self.last_laser_msg = msg
+        self.last_laser_msg = msg.front_distance
+        # self.get_logger().info("laserscanner callback" + str(msg.front_distance))
 
     # Determine the current status based on inputs
     def status_evaluation(self):
+
+        # Check if node has controll
+        if self.is_turned_on is False:
+            return
+
+        # Ensure laser message is available
+        if self.last_laser_msg is None:
+            self.get_logger().info("No laser message received yet")
+            return
 
         # Get most recent msg objects
         last_pic_msg = self.last_pic_msg
@@ -138,17 +156,8 @@ class lane_con(Node):
         # Call lane_holding to get speed and turn value
         speed, turn = self.lane_holding(last_pic_msg.line)
 
-        if last_pic_msg.sign == "":
-
-            # do nothing special
-            # lane holding algorithm
-            self.driving_sender("drive_normal", speed, turn)
-
-            # Update state
-            self.update_node_state("drive_normal")
-            return
-
-        elif last_laser_msg.distance <= 10 and last_laser_msg.angle in range(25, -25):
+        # Check laser always first because this is more reliable
+        if last_laser_msg <= 0.5 and last_laser_msg != 0.0:
 
             self.get_logger().info("Übergeben an obstacle_con")
 
@@ -160,6 +169,16 @@ class lane_con(Node):
 
             # Update state
             self.update_node_state("drive_around_obstacle")
+            return
+
+        elif last_pic_msg.sign == "":
+
+            # do nothing special
+            # lane holding algorithm
+            self.driving_sender("drive_normal", speed, turn)
+
+            # Update state
+            self.update_node_state("drive_normal")
             return
 
         elif last_pic_msg.sign in self.park_con_triggers:
@@ -197,7 +216,7 @@ class lane_con(Node):
 
             # Update state
             self.update_node_state("waiting_on_redlight")
-            return
+            # return lane_holding
 
         elif last_pic_msg.sign == "green light":
 
@@ -221,10 +240,9 @@ class lane_con(Node):
         # Get needed parameters
         speed_drive = self.get_parameter('speed_drive').get_parameter_value().double_value
         speed_turn = self.get_parameter('speed_turn').get_parameter_value().double_value
+        middle_pix = self.get_parameter('middle_pix').get_parameter_value().integer_value
+        offset_scaling = self.get_parameter('offset_scale').get_parameter_value().integer_value
         last_spin = self.last_spin
-
-        middle_pix = 550  # für 320px
-        offset_scaling = 23
 
         line_pos = data
         offset = abs(line_pos-middle_pix)
@@ -292,25 +310,28 @@ class lane_con(Node):
 
         if state != self.last_state:
             self.last_state == state
-            self.publisher_state.publish(String("Changed to " + state))
+            out = String()
+            out.data = "Changed to " + str(state)
+            self.publisher_state.publish(out)
+
+    def finish_move(self):
+        self.driving_sender("drive_normal", 0.115, 0.0)
+        time.sleep(1)
 
 
 def main(args=None):
     rclpy.init(args=args)
     node = lane_con()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
-
+    
     try:
         rclpy.spin(node)
 
     except KeyboardInterrupt:
-        print('Except in lane_con')
         node.destroy_node()
 
     finally:
-        print('Shutting Down lane_con')
+        node.destroy_node()
+        print('Shutting Down Lane_con')
 
 
 if __name__ == '__main__':
