@@ -31,7 +31,6 @@ setup(
             'driver = senv.driver:main',
             'camera = senv.camera:main',
             'laserscanner = senv.laserscanner:main',
-            'lane_detect = senv.lane_detect:main',
             'obstacle_con = senv.obstacle_con:main',
         ],
     },
