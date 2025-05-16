@@ -1,13 +1,18 @@
 import rclpy
-import rclpy.node
-from senv.stopper import Stopper
+from rclpy.node import Node
 from geometry_msgs.msg import Twist
+import signal
+import sys
+import threading
+import time
 
 
-class Driver(rclpy.node.Node):
+class Driver(Node):
     def __init__(self):
         super().__init__('driver')
-
+        self.publisher = self.create_publisher(Twist, 'cmd_vel', 1)
+        self.get_logger().info("Driver gestartet")
+        self.get_logger().info('Driver was initialized')
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
 
@@ -19,39 +24,70 @@ class Driver(rclpy.node.Node):
             qos_profile=qos_policy
         )
         self.subscriber  # prevent unused variable warning
+        # Stop-Flag
+        self.stop_requested = False
 
-        # Topic to publish
-        self.publisher = self.create_publisher(Twist, 'cmd_vel', 1)
+        # Signal-Handler korrekt registrieren
+        signal.signal(signal.SIGINT, self.handle_shutdown_signal)
+        signal.signal(signal.SIGTERM, self.handle_shutdown_signal)
 
     def driving_callback(self, msg: Twist):
         # Process the incoming message
-        self.get_logger() \
-            .info("Driver recieved data: " + str(msg.linear.x) + " : " + str(msg.angular.z))
+        self.get_logger().info(
+            "Driver recieved data: " + str(msg.linear.x) + " : " + str(msg.angular.z)
+            )
 
-        # Debug algorithm here
+        # Debuga algorithm here
 
         # Send final msg here
         self.publisher.publish(msg)
 
+    def publish_stop(self):
+        if rclpy.ok():
+            msg = Twist()
+            msg.linear.x = 0.0
+            msg.angular.z = 0.0
+            self.publisher.publish(msg)
+            self.get_logger().info('Stop-Befehl gesendet')
+        else:
+            self.get_logger().warn('Konnte Stop nicht senden – rclpy nicht mehr OK')
 
-def main(args=None):
+    def handle_shutdown_signal(self, signum, frame):
+        # Nur einmal reagieren
+        if self.stop_requested:
+            return
+        self.stop_requested = True
 
-    print('Hi from Driver')
-    rclpy.init(args=args, signal_handler_options=rclpy.SignalHandlerOptions.NO)
-    driver_node = Driver()
+        self.get_logger().warn(f"Signal {signum} empfangen – Stoppe Roboter...")
+
+        try:
+            self.publish_stop()
+            # ROS braucht Zeit, um das Publishing zu verarbeiten
+            rclpy.spin_once(self, timeout_sec=0.2)
+            time.sleep(0.2)
+        except Exception as e:
+            self.get_logger().error(f'Fehler beim Stoppen: {e}')
+        finally:
+            # Erst jetzt: Node zerstören und ROS beenden
+            self.get_logger().info('Beende Node...')
+            self.destroy_node()
+            rclpy.shutdown()
+            sys.exit(0)
+
+
+def main():
+    rclpy.init()
+    node = Driver()
+
+    # spin() in Thread, damit Signale verarbeitet werden können
+    spin_thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
+    spin_thread.start()
 
     try:
-        rclpy.spin(driver_node)
-
+        while rclpy.ok():
+            time.sleep(0.1)
     except KeyboardInterrupt:
-        driver_node.destroy_node()
-        stop = Stopper()
-
-    finally:
-        driver_node.destroy_node()
-        stop.destroy_node()
-        rclpy.shutdown()
-        print('Shutting Down Driver')
+        pass
 
 
 if __name__ == '__main__':
