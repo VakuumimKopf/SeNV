@@ -16,14 +16,12 @@ class obstacle_con(Node):
         super().__init__('obstacle_con')
         self.get_logger().info("Obstacle avoidance node started")
         # Parameters
-        self.declare_parameter('distance_to_obstacle', 0.4, float_desc(
+        self.declare_parameter('distance_to_obstacle', 0.6, float_desc(
             "Gewünschter Abstand zum Objekt"))
 
         self.turned_on = False
         self.state_obstacle = "Unknown"
         self.right_distance = 0.0
-        self.declare_parameter('distance_to_obstacle', 0.6
-                               )
 
         # QOS Policy Setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
