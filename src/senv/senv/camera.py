@@ -18,7 +18,8 @@ class camera(Node):
     def __init__(self):
         super().__init__('camera')
 
-        # set Parameters
+        # Define Parameters 
+
         self.declare_parameter('boundary_left', 100)
         # 200 für 640px, 100 für 320
         self.declare_parameter('boundary_right', 630)
@@ -29,8 +30,9 @@ class camera(Node):
         # Dynmaische Paramter für RotFarbgrenzen 1
         self.declare_parameter('low1red_color', 0, light_int_desc("Rot Farbwert Untere Grenze 1"))
         self.declare_parameter('low1red_sat', 100, light_int_desc("Rot Saturation Untere Grenze 1"))
-        self.declare_parameter('low1red_alpha', 100, light_int_desc("Rot Helligkeit Untere Grenze 1"
-                                                                    ))
+        self.declare_parameter('low1red_alpha', 100,
+                               light_int_desc("Rot Helligkeit Untere Grenze 1"))
+        
         self.declare_parameter('up1red_color', 10, light_int_desc("Rot Farbwert Obere Grenze 1"))
         self.declare_parameter('up1red_sat', 255, light_int_desc("Rot Saturation Obere Grenze 1"))
         self.declare_parameter('up1red_alpha', 255, light_int_desc("Rot Helligkeit Obere Grenze 1"))
@@ -53,6 +55,7 @@ class camera(Node):
 
         self.bridge = CvBridge()
         self.status = ""
+        self.last_spin = False  # False is gegen UHrzeigersinn, True is mit Uhrzeigersinn
 
         self.line_pos = 0
         self.hsv = np.array([])
@@ -63,9 +66,6 @@ class camera(Node):
         qos_policy = rclpy.qos.QoSProfile(
             reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
             history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
-
-        # False is gegen UHrzeigersinn, True is mit Uhrzeigersinn
-        self.last_spin = False
 
         # create subscribers for image data with changed qos
         self.subscription = self.create_subscription(
@@ -90,7 +90,8 @@ class camera(Node):
 
         # create variables for sign detection
         self.img = []
-        # self.start_time = time.time()  # Start time for image saving (timestamp for easier differentiation)
+        # self.start_time = time.time()  
+        # Start time for image saving (timestamp for easier differentiation)
 
     # raw data formating routine
     def image_callback(self, data):
