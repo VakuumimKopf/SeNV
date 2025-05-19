@@ -9,9 +9,10 @@ from senv.description import float_desc, int_desc, bool_desc, light_int_desc
 
 # Import ultralytics for sign detection with "pip install ultralytics"
 from ultralytics import YOLO
+# pip install yolov8
 # load model
 # change the path to your model found in senv as best.pt
-model = YOLO("/home/lennart/ros2_ws/src/senv/best.pt")  # z. B. "./yolo_model/best.pt"
+model = YOLO("src/senv/best.pt")  # z. B. "./yolo_model/best.pt"
 
 
 class camera(Node):
@@ -90,7 +91,8 @@ class camera(Node):
 
         # create variables for sign detection
         self.img = []
-        # self.start_time = time.time()  # Start time for image saving (timestamp for easier differentiation)
+        # self.start_time = time.time()
+        # Start time for image saving (timestamp for easier differentiation)
 
     # raw data formating routine
     def image_callback(self, data):
@@ -214,7 +216,7 @@ class camera(Node):
         status = ""
         if (hsv.size == 0):
             status = ""
-            return
+            return ""
         # Function for signs - string for Outputs("")
         # min_area = 30  # Minimale fläche für rotes licht
         # Farbgrenzen für rot
@@ -269,12 +271,12 @@ class camera(Node):
         if max_green_area >= max_red_area and max_green_area > 0:
             status = 'green light'
             self.waitingforgreen = False
-        self.status = status
+        # self.status = status
         cv2.imshow("IMG_red", red_mask)
         cv2.imshow("IMG_green", green_mask)
         cv2.waitKey(1)
 
-        return ""
+        return status
 
     # Use following function to create dataset of raw images
     """
@@ -331,25 +333,27 @@ class camera(Node):
         """
         Predict the class of an image using a pre-trained model.
         """
-        # get the image from the camera as np.array
-        image = self.bridge.compressed_imgmsg_to_cv2(self.img, desired_encoding='passthrough')
-        # Prediction (Inference)
-        results = model(image, verbose=False)  # kann auch save=True sein
+        if self.img != []:
+            # get the image from the camera as np.array
+            image = self.bridge.compressed_imgmsg_to_cv2(self.img, desired_encoding='passthrough')
+            # Prediction (Inference)
+            results = model(image, verbose=False)  # kann auch save=True sein
 
-        # classlist from model (the names must match your `data.yaml`)
-        class_names = model.names
+            # classlist from model (the names must match your `data.yaml`)
+            class_names = model.names
 
-        # IDs of the detected classes (e.g. 0, 1, 2 …)
-        class_ids = results[0].boxes.cls.cpu().numpy().astype(int)
+            # IDs of the detected classes (e.g. 0, 1, 2 …)
+            class_ids = results[0].boxes.cls.cpu().numpy().astype(int)
 
-        # Change labels to names
-        detected_labels = [class_names[i] for i in class_ids]
+            # Change labels to names
+            detected_labels = [class_names[i] for i in class_ids]
 
-        # when there is no sign detected, the list is empty
-        if detected_labels == []:
-            # self.get_logger().info("No sign detected")
+            # when there is no sign detected, the list is empty
+            if detected_labels == []:
+                # self.get_logger().info("No sign detected")
+                return ""
+        else:
             return ""
-
         """
         # DEBUG printet alle erkannten Schilder und zeigt Rahmen um diese
 

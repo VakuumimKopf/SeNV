@@ -27,7 +27,6 @@ class laserscanner(rclpy.node.Node):
         self.declare_parameter('speed_turn', 0.5)
         self.declare_parameter('laser_front', 0)
         self.declare_parameter('turn_time', 2.0)
-        
         # must ideally equal to an integer when divided by timer_period
         self.img_row = np.random.randint(0, 256, 640, dtype=np.uint8)
 
@@ -94,9 +93,9 @@ class laserscanner(rclpy.node.Node):
         msg.front_distance = self.front_distance
         msg.front_left_distance = self.front_left_distance
         msg.left_distance = self.left_distance
-        msg.left_back_distance = self.back_left_distance
+        msg.back_left_distance = self.back_left_distance
         msg.back_distance = self.back_distance
-        msg.right_back_distance = self.back_right_distance
+        msg.back_right_distance = self.back_right_distance
         msg.right_distance = self.right_distance
         msg.front_right_distance = self.front_right_distance
         self.publisher_laserturn.publish(msg)
