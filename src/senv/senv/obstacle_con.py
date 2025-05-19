@@ -64,7 +64,7 @@ class obstacle_con(Node):
         self.right_distance = msg.right_distance
         if self.right_distance == "inf":
             self.right_distance = 0.0
-        if msg.front_distance <= 0.5 and msg.front_distance != 0:
+        if msg.front_distance <= 0.4 and msg.front_distance != 0:
             self.state_obstacle = "Infront"
 
         self.get_logger().info(f"right distance: {self.right_distance}")
@@ -89,7 +89,7 @@ class obstacle_con(Node):
             if self.right_distance > 0.8:
                 self.drive_length(0.2)
             while self.right_distance > 0.8:
-                # self.get_logger().info("waiting till obstacle is right of me")
+                # self.get_logger().info("waiting till obstaanpassen an Abstand zw. lückencle is right of me")
                 self.wait_ros2(0)
 
             self.turn90(1.0, 3)

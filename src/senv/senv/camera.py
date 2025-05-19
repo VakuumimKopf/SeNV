@@ -272,9 +272,9 @@ class camera(Node):
             status = 'green light'
             self.waitingforgreen = False
         # self.status = status
-        cv2.imshow("IMG_red", red_mask)
-        cv2.imshow("IMG_green", green_mask)
-        cv2.waitKey(1)
+        # cv2.imshow("IMG_red", red_mask)
+        # cv2.imshow("IMG_green", green_mask)
+        # cv2.waitKey(1)
 
         return status
 
@@ -352,6 +352,7 @@ class camera(Node):
             if detected_labels == []:
                 # self.get_logger().info("No sign detected")
                 return ""
+            return detected_labels[0]
         else:
             return ""
         """
@@ -367,7 +368,6 @@ class camera(Node):
         """
 
         # return first detected label
-        return detected_labels[0]
 
 
 def main(args=None):

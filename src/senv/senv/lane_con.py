@@ -38,9 +38,8 @@ class lane_con(Node):
         self.last_pic_msg = Pic()
         self.last_laser_msg = 0.0
         # Action trigger parameter
-        self.park_con_triggers = ["park_sign"]
-        self.intersection_con_triggers = ["intersection_sign_left", "intersection_sign_right",
-                                          "intersection_sign_straight"]
+        self.park_con_triggers = ["Park"]
+        self.intersection_con_triggers = ["left", "right", "straight"]
 
         # Qos policy setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,

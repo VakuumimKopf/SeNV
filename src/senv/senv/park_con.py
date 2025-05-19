@@ -278,6 +278,7 @@ class park_con(Node):
 
     def laneholding_until_sign(self, interval_sec):
         while self.sign_detected is False:
+            self.get_logger().info("Lanholding until sign in Park_con")
             msg = self.lane_msg
             self.publisher_driver.publish(msg)
             self.wait_ros2(interval_sec)
