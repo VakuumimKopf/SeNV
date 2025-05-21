@@ -15,7 +15,6 @@ class Driver(Node):
         self.get_logger().info('Driver was initialized')
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
-
         # Topic subscription
         self.subscriber = self.create_subscription(
             Twist,
@@ -85,7 +84,7 @@ def main():
 
     try:
         while rclpy.ok():
-            time.sleep(0.1)
+            time.sleep(0.01)
     except KeyboardInterrupt:
         pass
 

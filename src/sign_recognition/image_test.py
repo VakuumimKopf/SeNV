@@ -2,15 +2,16 @@ from ultralytics import YOLO
 
 
 # Modell laden
-model = YOLO("src/sign_recognition/best.pt")  # z. B. "./yolo_model/best.pt"
+model = YOLO("sign_recognition/best2.0.pt")  # z. B. "./yolo_model/best.pt"
 
 # Bildpfad (ersetzen durch dein Bild)
-img_path = "src/sign_recognition/test.jpg"
+img_path = "sign_recognition/test.jpg"
 
 # Vorhersage (Inferenz)
 results = model(img_path)  # kann auch save=True sein
 
-# Klassenliste aus dem Modell (die Namen müssen mit deinem `data.yaml` übereinstimmen!)
+# Klassenliste aus dem Modell (die Namen müssen mit deinem `data.yaml`
+# übereinstimmen!)
 class_names = model.names
 
 # IDs der erkannten Klassen (z. B. 0, 1, 2 …)

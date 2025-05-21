@@ -12,7 +12,7 @@ from ultralytics import YOLO
 # pip install yolov8
 # load model
 # change the path to your model found in senv as best.pt
-model = YOLO("src/senv/best.pt")  # z. B. "./yolo_model/best.pt"
+model = YOLO("senv/best.pt")  # z. B. "./yolo_model/best.pt"
 
 
 class camera(Node):

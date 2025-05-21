@@ -33,7 +33,7 @@ class lane_con(Node):
         # State Parameters of the node
         self.is_turned_on = True
         self.last_state = ""
-
+        self.wait_at_start = 0
         # Last incoming msg
         self.last_pic_msg = Pic()
         self.last_laser_msg = 0.0
@@ -138,11 +138,14 @@ class lane_con(Node):
 
     # Determine the current status based on inputs
     def status_evaluation(self):
-
         # Check if node has controll
         if self.is_turned_on is False:
             return
-
+        if self.wait_at_start < 100:
+            self.get_logger().info("Waiting for start signal")
+            self.wait_at_start += 1
+            return
+            
         # Ensure laser message is available
         if self.last_laser_msg is None:
             self.get_logger().info("No laser message received yet")
@@ -151,6 +154,8 @@ class lane_con(Node):
         # Get most recent msg objects
         last_pic_msg = self.last_pic_msg
         last_laser_msg = self.last_laser_msg
+
+        self.get_logger().info(str(last_pic_msg.sign))
 
         # Call lane_holding to get speed and turn value
         speed, turn = self.lane_holding(last_pic_msg.line)
@@ -316,6 +321,12 @@ class lane_con(Node):
     def finish_move(self):
         self.driving_sender("drive_normal", 0.115, 0.0)
         time.sleep(1)
+
+    def wait_ros2(self, duration):
+        """ROS 2-kompatibles Warten, ohne Callbacks zu blockieren."""
+        start_time = self.get_clock().now().nanoseconds
+        while (self.get_clock().now().nanoseconds - start_time) / 1e9 < duration:
+            rclpy.spin_once(self, timeout_sec=0.1)
 
 
 def main(args=None):
