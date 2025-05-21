@@ -88,14 +88,14 @@ class lane_detect(Node):
             self.get_logger().info(str(num))
             #  Appling hough transform returning set of found lines
             hough = self.hough_transform(region, raw_image, num)
-            self.filtering(hough, raw_image, num)
+            filtered = self.filtering(hough, raw_image, num)
 
             #  Catch if no hough lines are detected
             if hough is None:
                 continue
 
             # Appling hough lines on input image
-            lines = self.lane_lines(hough, segment_info[num])
+            lines = self.lane_lines(filtered, segment_info[num])
             result = self.draw_lane_lines(last_result, lines)
             last_result = result
             num = num + 1
@@ -110,13 +110,14 @@ class lane_detect(Node):
     def filtering(self, lines: np.ndarray, image, num):
 
         #  Parameters
-        pair_margin = 0.05
         canvas = np.zeros_like(image)
+        pair_margin = 0.5
+        max_x_distance = 100
+        min_intercept_distance = 10
+        max_intercept_distance = 30
 
-        found_pair = []
         arr = []
-
-        #  Calculate the slope for all lines
+        #  Calculate the slope, middle and intercept for all lines
         for line in lines:
             for x1, y1, x2, y2 in line:
                 # Throw away all vertical lines
@@ -124,51 +125,90 @@ class lane_detect(Node):
                     continue
                 else:
                     slope = (y2 - y1) / (x2 - x1)
-                    arr.append([x1, x2, y1, y2, slope])
+                    middle = (x1 + x2) / 2
+                    intercept = y1 - (slope * x1)
+                    arr.append([x1, y1, x2, y2, slope, middle, intercept])
 
         #  Sort the array based on slope
         arr.sort(key=lambda x: x[4])
 
-        # Find pairs
-        for i in range(0, len(arr)-1):
-            if (arr[i][4] + pair_margin) >= arr[i+1][4] and (arr[i][4] - pair_margin) <= arr[i+1][4]:
-                if (abs(arr[i][1] - arr[i+1][1])) >= 5 and (abs(arr[i][1] - arr[i+1][1])) <= 15:
-                    found_pair.append([arr[i], arr[i+1]])
+        #  Determine Groups where the lines have similar slope,
+        #  are near to eachother and have a certain intercept distance
+        groupes = self.finding_groups(arr, pair_margin, max_x_distance)
 
-        #  Draw Pairs
-        for i in range(0, len(found_pair)):
-            pair = lines[i]
-            for j in range(0, len(pair)):
-                line = pair[j]
-                cv2.line(canvas, (line[0], line[1]), (line[2], line[3]), (0, 0, 255), 3, cv2.LINE_AA)
+        #  Draw Groups
+        for i in range(0, len(groupes)):
+            groupe = groupes[i]
+            color = list(np.random.random(size=3) * 256)
+            for j in range(0, len(groupe)):
+                line = groupe[j]
+                cv2.line(canvas, (line[0], line[1]), (line[2], line[3]), color, 3, cv2.LINE_AA)
 
         cv2.imshow("canvas" + str(num), canvas)
-        self.get_logger().info(str(found_pair))
 
+        out = []
+        #  Combine Groups into np array
+        for i in range(0, len(groupes)):
+            groupe = groupes[i]
+            for j in range(0, len(groupe)):
+                line = groupe[j]
+                out.append([line[0], line[1], line[2], line[3]])
+        return out
 
-    def contours(self, image):
-        """cnts, hierarchy = cv2.findContours(image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        cnts = cnts[0] if len(cnts) == 2 else cnts[1]
-        con = np.zeros_like(image)
+    #  Group lines based on slope, pair_margin determines range of slope of a group
+    def finding_groups(self, a, pair_margin, max_distance):
 
-        cv2.drawContours(con, cnts, -1, (255, 255, 255), 1)
-        # Iterate thorugh contours and draw rectangles around contours
-        for c in cnts:
-            rect = cv2.minAreaRect(c)
-            box = cv2.boxPoints(rect)
-            box = np.int0(box)
-            self.get_logger().info(str(box))
-            cv2.drawContours(con, [box], 0, (255, 0, 255), 2)"""
-        cnts = cv2.findContours(image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        cnts = cnts[0] if len(cnts) == 2 else cnts[1]
-        con = np.zeros_like(image)
+        #  Variable
+        out = []
+        group = []
 
-        # Iterate thorugh contours and draw rectangles around contours
-        for c in cnts:
-            x, y, w, h = cv2.boundingRect(c)
-            cv2.rectangle(con, (x, y), (x + w, y + h), (36, 255, 12), 2)
+        #  Iterate throuh whole list
+        for i in range(0, len(a)):
 
-        return con
+            #  Check if a new group, and if so just append the current element and continue
+            if len(group) == 0:
+
+                group.append(a[i])
+                continue
+
+            #  Check if the new elements slope is in the right range
+            slope_in_range = a[i][4] >= self.group_min(group, 4) and a[i][4] <= self.group_min(group, 4) + pair_margin
+
+            #  Check if the new element is near the others of the group
+            distance_in_range = a[i][5] <= self.group_min(group, 5) + max_distance and a[i][5] >= self.group_max(group, 5) - max_distance
+
+            if slope_in_range and distance_in_range:
+                group.append(a[i])
+
+            else:
+                if (len(group) > 1):
+                    out.append(group)
+                group = [a[i]]
+
+        if (len(group) > 1):
+            out.append(group)
+
+        return out
+
+    #  Determines the min value of a group of arrays
+    def group_min(self, group, n):
+        min = None
+        for i in range(0, len(group)):
+            if min is None:
+                min = group[i][n]
+            elif group[i][n] < min:
+                min = group[i][n]
+        return min
+
+    #  Determines the min value of a group of arrays
+    def group_max(self, group, n):
+        max = None
+        for i in range(0, len(group)):
+            if max is None:
+                max = group[i][n]
+            elif group[i][n] > max:
+                max = group[i][n]
+        return max
 
     def segment_info(self, image, n):
 
@@ -185,6 +225,7 @@ class lane_detect(Node):
 
         ignore_mask_color = 255
         rows, cols = image.shape[:2]
+        self.get_logger().info(str(rows) + " : " + str(cols))
         masked_images = []
         n = len(segment_info)
 
@@ -214,8 +255,8 @@ class lane_detect(Node):
         #  Parameters
         rho = 1
         theta = np.pi/180
-        threshold = 10
-        minLineLength = 10
+        threshold = 30
+        minLineLength = 20
         maxLineGap = 50
 
         lines = cv2.HoughLinesP(image, rho=rho, theta=theta, threshold=threshold,
@@ -262,38 +303,42 @@ class lane_detect(Node):
         right_weights = []  # (length,)
 
         straight_lines = []  # Array for all straight lines
-        for line in lines:
-            for x1, y1, x2, y2 in line:
+        for i in range(0, len(lines)):
+            line = lines[i]
+            x1 = line[0]
+            y1 = line[1]
+            x2 = line[2]
+            y2 = line[3]
 
-                #  Ignore all Vertical lines
-                if x1 == x2:
-                    continue
+            #  Ignore all Vertical lines
+            if x1 == x2:
+                continue
 
-                # Calculating slope of a line
-                slope = (y2 - y1) / (x2 - x1)
+            # Calculating slope of a line
+            slope = (y2 - y1) / (x2 - x1)
 
-                # Calculating weigth dependent of the distance to the middle
-                weigth = 1 - (abs(((x1 + x2) / 2) - middle) / middle)
+            # Calculating weigth dependent of the distance to the middle
+            weigth = 1 - (abs(((x1 + x2) / 2) - middle) / middle)
 
-                # Calculating intercept of a line
-                intercept = y1 - (slope * x1)
+            # Calculating intercept of a line
+            intercept = y1 - (slope * x1)
 
-                # Calculating length of a line
-                length = np.sqrt(((y2 - y1) ** 2) + ((x2 - x1) ** 2))
+            # Calculating length of a line
+            length = np.sqrt(((y2 - y1) ** 2) + ((x2 - x1) ** 2))
 
-                # slope of left lane is negative and for right lane slope is positive
-                if slope < -(filter_value_straight_lines):
+            # slope of left lane is negative and for right lane slope is positive
+            if slope < -(filter_value_straight_lines):
 
-                    left_lines.append((slope, intercept))
-                    left_weights.append((length * weigth))
+                left_lines.append((slope, intercept))
+                left_weights.append((length * weigth))
 
-                elif slope > filter_value_straight_lines:
+            elif slope > filter_value_straight_lines:
 
-                    right_lines.append((slope, intercept))
-                    right_weights.append((length * weigth))
+                right_lines.append((slope, intercept))
+                right_weights.append((length * weigth))
 
-                else:
-                    straight_lines.append(line)
+            else:
+                straight_lines.append(line)
 
         #  Convert in a single line
         left_lane = np.dot(left_weights,  left_lines) / np.sum(left_weights) if len(left_weights) > 0 else None
