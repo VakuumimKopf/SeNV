@@ -47,7 +47,6 @@ class lane_detect(Node):
         greyscale = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
 
         #  Applying gaussian blur for noise reduction
-        #  Parameter
         kernel_size = 5
         blur = cv2.GaussianBlur(greyscale, (kernel_size, kernel_size), 0)
 
@@ -81,36 +80,48 @@ class lane_detect(Node):
 
         #  Looping through all segments
         result = None
+        last_lane_lines = None
         last_result = raw_image
         num = 0
+        guiding_lines = []
         for region in regions:
 
             self.get_logger().info(str(num))
+
             #  Appling hough transform returning set of found lines
-            hough = self.hough_transform(region, raw_image, num)
-            filtered = self.filtering(hough, raw_image, num)
+            hough = self.hough_transform(region, num)
 
             #  Catch if no hough lines are detected
             if hough is None:
                 continue
 
-            # Appling hough lines on input image
+            #  Filtering the found lines
+            filtered = self.filtering(hough, last_lane_lines, num)
+
+            #  Calculating side lines of road
             lines = self.lane_lines(filtered, segment_info[num])
+
+            #  Calculating guiding lines
+            guiding_lines.append(self.get_guiding_line(lines))
+
             result = self.draw_lane_lines(last_result, lines)
             last_result = result
             num = num + 1
 
         if result is None:
             return
+        
+        self.get_logger().info(str(guiding_lines))
+        result = self.draw_lane_lines(result, guiding_lines)
 
         cv2.imshow("Result", result)
         cv2.waitKey(1)
 
     #  Filtering a set of lines based on lane widthe
-    def filtering(self, lines: np.ndarray, image, num):
+    def filtering(self, lines: np.ndarray, last_lane_lines, num):
 
         #  Parameters
-        canvas = np.zeros_like(image)
+        canvas = np.zeros_like(self.raw_image)
         pair_margin = 0.5
         max_x_distance = 100
         min_intercept_distance = 10
@@ -132,9 +143,11 @@ class lane_detect(Node):
         #  Sort the array based on slope
         arr.sort(key=lambda x: x[4])
 
-        #  Determine Groups where the lines have similar slope,
-        #  are near to eachother and have a certain intercept distance
+        #  Determine Groups where the lines have similar slope, are near to eachother
         groupes = self.finding_groups(arr, pair_margin, max_x_distance)
+
+        #  Filter each group so only lines at the right distance remain
+        # f_groups = self.filter_for_distance(groupes, max_intercept_distance, min_intercept_distance)
 
         #  Draw Groups
         for i in range(0, len(groupes)):
@@ -210,6 +223,15 @@ class lane_detect(Node):
                 max = group[i][n]
         return max
 
+    def filter_for_distace(groups, max_intercept_distance, min_intercept_distance):
+        out = []
+        for i in range(len(groups)):
+            group = groups[i]
+            new = []
+            for j in range(len(group)):
+                line = group[j]
+        return out
+
     def segment_info(self, image, n):
 
         segments = []
@@ -250,7 +272,7 @@ class lane_detect(Node):
         return masked_images
 
     #  Determine and cut region of interest
-    def hough_transform(self, image, raw_image, num):
+    def hough_transform(self, image, num):
 
         #  Parameters
         rho = 1
@@ -262,35 +284,42 @@ class lane_detect(Node):
         lines = cv2.HoughLinesP(image, rho=rho, theta=theta, threshold=threshold,
                                 minLineLength=minLineLength, maxLineGap=maxLineGap)
 
-        cdstP = copy(raw_image)
+        canvas = copy(self.raw_image)
 
         if lines is not None:
             for i in range(0, len(lines)):
                 line = lines[i][0]
-                cv2.line(cdstP, (line[0], line[1]), (line[2], line[3]), (0, 0, 255), 3, cv2.LINE_AA)
+                cv2.line(canvas, (line[0], line[1]), (line[2], line[3]), (0, 0, 255), 3, cv2.LINE_AA)
 
-        cv2.imshow("hough" + str(num), cdstP)
+        cv2.imshow("hough" + str(num), canvas)
         return lines
 
     def draw_lane_lines(self, image, lines, color=[0, 0, 255], thickness=10):
 
-        line_image = np.zeros_like(image)
-        for line in lines:
-            if line is not None:
-                cv2.line(line_image, *line,  color, thickness)
+        self.get_logger().info(str(lines))
+        canvas = np.zeros_like(image)
 
-        cv2.imshow("Lines", line_image)
-        return cv2.addWeighted(image, 1.0, line_image, 1.0, 0.0)
+        if lines is not None:
+            for i in range(0, len(lines)):
+                line = lines[i]
+                if line is not None:
+                    cv2.line(canvas, (line[0], line[1]), (line[2], line[3]), (0, 0, 255), 3, cv2.LINE_AA)
+
+        return cv2.addWeighted(image, 1.0, canvas, 1.0, 0.0)
 
     def lane_lines(self, lines, segment_info):
-        left_lane, right_lane = self.average_slope_intercept(lines)
+        left_lane, right_lane = self.build_road_lines(lines)
         y1 = segment_info[0]
         y2 = segment_info[1]
         left_line = self.pixel_points(y1, y2, left_lane)
         right_line = self.pixel_points(y1, y2, right_lane)
-        return left_line, right_line
+        out = []
+        if left_line is not None and right_line is not None:
+            out.append([left_line[0][0], left_line[0][1], left_line[1][0], left_line[1][1]])
+            out.append([right_line[0][0], right_line[0][1], right_line[1][0], right_line[1][1]])
+        return out
 
-    def average_slope_intercept(self, lines):
+    def build_road_lines(self, lines):
 
         #  Parameters
         filter_value_straight_lines = 0.4  # Defining what is maximum slope for straight lines
@@ -356,10 +385,25 @@ class lane_detect(Node):
         y2 = int(y2)
         return ((x1, y1), (x2, y2))
 
+    def get_guiding_line(self, lines):
+
+        if len(lines) == 2:
+            line = lines[0]
+            n_line = lines[1]
+            x1 = round((line[0] + n_line[0]) / 2)
+            y1 = line[1]
+            x2 = round((line[2] + n_line[2]) / 2)
+            y2 = line[3]
+
+            return [x1, y1, x2, y2]
+        else:
+            self.get_logger().info("Error in get_guiding_line")
+            return None
+
 
 def main(args=None):
 
-    img = cv2.imread("/home/oliver/senv_ws/src/senv/senv/image.png")
+    img = cv2.imread("/home/oliver/senv_ws/src/senv/senv/image2.png")
 
     rclpy.init(args=args)
     node = lane_detect()
