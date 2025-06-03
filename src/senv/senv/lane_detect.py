@@ -6,6 +6,8 @@ import numpy as np
 from copy import copy
 from senv_interfaces.msg import Pic
 from cv_bridge import CvBridge
+import math
+from geometry_msgs.msg import Twist
 
 
 class lane_detect(Node):
@@ -17,6 +19,8 @@ class lane_detect(Node):
         #  Variables
         self.edges = None
         self.raw_image = None
+        self.canvas = None
+        self.guiding_lines = None
         self.bridge = CvBridge()
 
         # definition of the QoS in order to receive data despite WiFi
@@ -24,7 +28,7 @@ class lane_detect(Node):
             reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
             history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
 
-        """# create subscribers for image data with changed qos
+        # create subscribers for image data with changed qos
         self.subscription = self.create_subscription(
             CompressedImage,
             '/image_raw/compressed',
@@ -32,16 +36,23 @@ class lane_detect(Node):
             qos_profile=qos_policy)
         self.subscription  # prevent unused variable warning
 
+        self.publisher_driver = self.create_publisher(Twist, 'driving', qos_profile=qos_policy)
+
         # create timers for lane detection
         self.lane_timer_period = 0.1
         self.lane_timer = self.create_timer(
-            self.lane_timer_period, self.lane_detection)"""
+            self.lane_timer_period, self.lane_detection)
+        
+        # create timers for drive
+        self.drive_timer_period = 0.1
+        self.drive_timer = self.create_timer(
+            self.drive_timer_period, self.drive)
 
     # raw data formating routine
     def image_callback(self, data):
 
-        #  img_cv = self.bridge.compressed_imgmsg_to_cv2(data, desired_encoding='passthrough')
-        img_cv = data
+        img_cv = self.bridge.compressed_imgmsg_to_cv2(data, desired_encoding='passthrough')
+        #  img_cv = data
 
         #  Convert RGB image to greyscale
         greyscale = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
@@ -51,7 +62,7 @@ class lane_detect(Node):
         blur = cv2.GaussianBlur(greyscale, (kernel_size, kernel_size), 0)
 
         #  Applying canny edge detection of the whole image
-        low_t = 120  # first threshhold for hysteresis
+        low_t = 80  # first threshhold for hysteresis
         high_t = 250  # secound treshhold
         edges = cv2.Canny(blur, low_t, high_t)
 
@@ -68,6 +79,7 @@ class lane_detect(Node):
         #  copy current version of self.edges and self.raw_image
         edges = copy(self.edges)
         raw_image = copy(self.raw_image)
+        self.canvas = np.zeros_like(self.raw_image)
 
         if edges is None or raw_image is None:
             return
@@ -83,7 +95,7 @@ class lane_detect(Node):
         last_lane_lines = None
         last_result = raw_image
         num = 0
-        guiding_lines = []
+        guiding_lines = [None, None, None]
         for region in regions:
 
             self.get_logger().info(str(num))
@@ -102,30 +114,35 @@ class lane_detect(Node):
             lines = self.lane_lines(filtered, segment_info[num])
 
             #  Calculating guiding lines
-            guiding_lines.append(self.get_guiding_line(lines))
+            guiding_lines[num] = self.get_guiding_line(lines)
 
             result = self.draw_lane_lines(last_result, lines)
             last_result = result
             num = num + 1
 
+        cv2.imshow("Used", self.canvas)
+        self.get_logger().info("Gui" + str(guiding_lines))
         if result is None:
             return
         
-        self.get_logger().info(str(guiding_lines))
-        result = self.draw_lane_lines(result, guiding_lines)
+        self.update_guiding_lines(guiding_lines)
+        self.get_logger().info("Guiding Line: " + str(self.guiding_lines))
+        result = self.draw_lane_lines(result, self.guiding_lines)
 
         cv2.imshow("Result", result)
         cv2.waitKey(1)
+
+        
 
     #  Filtering a set of lines based on lane widthe
     def filtering(self, lines: np.ndarray, last_lane_lines, num):
 
         #  Parameters
         canvas = np.zeros_like(self.raw_image)
-        pair_margin = 0.5
+        pair_margin = 0.7
         max_x_distance = 100
-        min_intercept_distance = 10
-        max_intercept_distance = 30
+        min_intercept_distance = 8
+        max_intercept_distance = 27
 
         arr = []
         #  Calculate the slope, middle and intercept for all lines
@@ -146,9 +163,6 @@ class lane_detect(Node):
         #  Determine Groups where the lines have similar slope, are near to eachother
         groupes = self.finding_groups(arr, pair_margin, max_x_distance)
 
-        #  Filter each group so only lines at the right distance remain
-        # f_groups = self.filter_for_distance(groupes, max_intercept_distance, min_intercept_distance)
-
         #  Draw Groups
         for i in range(0, len(groupes)):
             groupe = groupes[i]
@@ -158,6 +172,10 @@ class lane_detect(Node):
                 cv2.line(canvas, (line[0], line[1]), (line[2], line[3]), color, 3, cv2.LINE_AA)
 
         cv2.imshow("canvas" + str(num), canvas)
+
+        #  Filter each group so only lines at the right distance remain
+        groupes = self.filter_for_distance(groupes, max_intercept_distance, min_intercept_distance)
+        #  self.get_logger().info("Abstände: " + str(f_groups))
 
         out = []
         #  Combine Groups into np array
@@ -200,7 +218,6 @@ class lane_detect(Node):
 
         if (len(group) > 1):
             out.append(group)
-
         return out
 
     #  Determines the min value of a group of arrays
@@ -223,14 +240,78 @@ class lane_detect(Node):
                 max = group[i][n]
         return max
 
-    def filter_for_distace(groups, max_intercept_distance, min_intercept_distance):
+    def filter_for_distance(self, groups, max_intercept_distance, min_intercept_distance):
         out = []
         for i in range(len(groups)):
             group = groups[i]
             new = []
             for j in range(len(group)):
-                line = group[j]
+                for k in range(j+1, len(group)):
+
+                    line1 = group[j]
+                    line2 = group[k]
+                    distance = self.segments_distance(line1[0], line1[1], line1[2], line1[3], line2[0], line2[1], line2[2], line2[3])
+                    if min_intercept_distance <= distance <= max_intercept_distance:
+                        new.append(line1)
+                        new.append(line2)
+            out.append(new)
         return out
+
+    def segments_distance(self, x11, y11, x12, y12, x21, y21, x22, y22):
+        """ distance between two segments in the plane:
+            one segment is (x11, y11) to (x12, y12)
+            the other is   (x21, y21) to (x22, y22)
+        """
+        if self.segments_intersect(x11, y11, x12, y12, x21, y21, x22, y22):
+            return 0
+        # try each of the 4 vertices w/the other segment
+        distances = []
+        distances.append(self.point_segment_distance(x11, y11, x21, y21, x22, y22))
+        distances.append(self.point_segment_distance(x12, y12, x21, y21, x22, y22))
+        distances.append(self.point_segment_distance(x21, y21, x11, y11, x12, y12))
+        distances.append(self.point_segment_distance(x22, y22, x11, y11, x12, y12))
+        return min(distances)
+
+    def segments_intersect(self, x11, y11, x12, y12, x21, y21, x22, y22):
+        """ whether two segments in the plane intersect:
+            one segment is (x11, y11) to (x12, y12)
+            the other is   (x21, y21) to (x22, y22)
+        """
+        dx1 = x12 - x11
+        dy1 = y12 - y11
+        dx2 = x22 - x21
+        dy2 = y22 - y21
+        delta = dx2 * dy1 - dy2 * dx1
+        if delta == 0:
+            return False  # parallel segments
+        s = (dx1 * (y21 - y11) + dy1 * (x11 - x21)) / delta
+        t = (dx2 * (y11 - y21) + dy2 * (x21 - x11)) / (-delta)
+        return (0 <= s <= 1) and (0 <= t <= 1)
+
+    def point_segment_distance(self, px, py, x1, y1, x2, y2):
+        dx = x2 - x1
+        dy = y2 - y1
+        if dx == dy == 0:  # the segment's just a point
+            return math.hypot(px - x1, py - y1)
+
+        # Calculate the t that minimizes the distance.
+        t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)
+
+        # See if this represents one of the segment's
+        # end points or a point in the middle.
+        if t < 0:
+            dx = px - x1
+            dy = py - y1
+        elif t > 1:
+            dx = px - x2
+            dy = py - y2
+        else:
+            near_x = x1 + t * dx
+            near_y = y1 + t * dy
+            dx = px - near_x
+            dy = py - near_y
+
+        return math.hypot(dx, dy)
 
     def segment_info(self, image, n):
 
@@ -247,7 +328,6 @@ class lane_detect(Node):
 
         ignore_mask_color = 255
         rows, cols = image.shape[:2]
-        self.get_logger().info(str(rows) + " : " + str(cols))
         masked_images = []
         n = len(segment_info)
 
@@ -277,9 +357,9 @@ class lane_detect(Node):
         #  Parameters
         rho = 1
         theta = np.pi/180
-        threshold = 30
-        minLineLength = 20
-        maxLineGap = 50
+        threshold = 20
+        minLineLength = 10
+        maxLineGap = 70
 
         lines = cv2.HoughLinesP(image, rho=rho, theta=theta, threshold=threshold,
                                 minLineLength=minLineLength, maxLineGap=maxLineGap)
@@ -296,7 +376,6 @@ class lane_detect(Node):
 
     def draw_lane_lines(self, image, lines, color=[0, 0, 255], thickness=10):
 
-        self.get_logger().info(str(lines))
         canvas = np.zeros_like(image)
 
         if lines is not None:
@@ -322,7 +401,7 @@ class lane_detect(Node):
     def build_road_lines(self, lines):
 
         #  Parameters
-        filter_value_straight_lines = 0.4  # Defining what is maximum slope for straight lines
+        filter_value_straight_lines = 0.3  # Defining what is maximum slope for straight lines
         middle = 320
 
         #  Define Variables
@@ -330,6 +409,8 @@ class lane_detect(Node):
         left_weights = []  # (length,)
         right_lines = []  # (slope, intercept)
         right_weights = []  # (length,)
+
+        selected_lines = []
 
         straight_lines = []  # Array for all straight lines
         for i in range(0, len(lines)):
@@ -343,11 +424,13 @@ class lane_detect(Node):
             if x1 == x2:
                 continue
 
+            middle_of_line = (x1 + x2) / 2
+
             # Calculating slope of a line
             slope = (y2 - y1) / (x2 - x1)
 
             # Calculating weigth dependent of the distance to the middle
-            weigth = 1 - (abs(((x1 + x2) / 2) - middle) / middle)
+            # weigth = 1 - (abs(((x1 + x2) / 2) - middle) / middle)
 
             # Calculating intercept of a line
             intercept = y1 - (slope * x1)
@@ -357,17 +440,21 @@ class lane_detect(Node):
 
             # slope of left lane is negative and for right lane slope is positive
             if slope < -(filter_value_straight_lines):
-
-                left_lines.append((slope, intercept))
-                left_weights.append((length * weigth))
+                if middle_of_line <= middle:
+                    left_lines.append((slope, intercept))
+                    left_weights.append((length))
+                    selected_lines.append(line)
 
             elif slope > filter_value_straight_lines:
-
-                right_lines.append((slope, intercept))
-                right_weights.append((length * weigth))
+                if middle_of_line >= middle:
+                    right_lines.append((slope, intercept))
+                    right_weights.append((length))
+                    selected_lines.append(line)
 
             else:
                 straight_lines.append(line)
+
+        self.canvas = self.draw_lane_lines(self.canvas, selected_lines)
 
         #  Convert in a single line
         left_lane = np.dot(left_weights,  left_lines) / np.sum(left_weights) if len(left_weights) > 0 else None
@@ -400,6 +487,65 @@ class lane_detect(Node):
             self.get_logger().info("Error in get_guiding_line")
             return None
 
+    def update_guiding_lines(self, lines):
+        old = self.guiding_lines
+        if old is None:
+            self.guiding_lines = lines 
+            return
+        for i in range(len(lines)):
+            if old[i] is None:
+                lines[i] = lines[i]
+            elif lines[i] is None:
+                lines[i] = old[i]
+            else:
+                x1_c = old[i][0] - lines[i][0]
+                x2_c = old[i][2] - lines[i][2]
+                self.get_logger().info(str([x1_c, x2_c]))
+                if abs(x1_c) > 50 or abs(x2_c > 50):
+                    lines[i][0] = round((old[i][0] + lines[i][0]) / 2)
+                    lines[i][2] = round((old[i][2] + lines[i][2]) / 2)
+                else:
+                    lines[i] = lines[i]
+
+        self.guiding_lines = lines
+
+    def drive(self):
+        self.get_logger().info("Test")
+        lines = self.guiding_lines
+        if lines is None:
+            return
+        if lines[0] is None:
+            return
+        x1 = lines[0][0]
+        x2 = lines[0][2]
+
+        x_d = (x1 + x2) / 2
+
+        middle = 320
+        area_short = 15
+        area_long = 35
+        turn = 0.0
+        if x_d < middle - area_short:
+            if x_d < middle - area_long:
+                turn = 0.35
+            else:
+                turn = 0.3
+        elif x_d > middle + area_short:
+            if x_d > middle + area_long:
+                turn = -0.35
+            else:
+                turn = -0.3        
+        else:
+            turn = 0.0
+        
+        msg = Twist()
+        msg.angular.z = turn
+        msg.linear.x = 0.2*(1-abs(turn))
+        self.get_logger().info(str(0.2*(1-abs(turn))))
+
+        self.get_logger().info("Test: " + str(msg))
+        self.publisher_driver.publish(msg)
+
 
 def main(args=None):
 
@@ -407,8 +553,8 @@ def main(args=None):
 
     rclpy.init(args=args)
     node = lane_detect()
-    node.image_callback(img)
-    node.lane_detection()
+    #  node.image_callback(img)
+    #  node.lane_detection()
     cv2.waitKey(0)
 
     try:
