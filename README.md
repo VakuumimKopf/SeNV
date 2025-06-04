@@ -41,7 +41,7 @@ https://www.planttext.com?text=RL9HQiCm33s1xo3ojNraHnXbx0JRPoX3IPJKr963ehIKqhjFJ
 - **Parklücken mit/ohne Objekt verifizieren**: Das Fahrzeug fährt an den einzelnen Lücken entlang und misst mittels Laserscanner, ob ein Objekt diese blockiert.
 - **Einparken**: Sobald eine Lücke als frei erkannt wurde, setzt das Fahrzeug zurück, dreht sich um 90° und fährt in die Lücke. Anschließend wird auf gleiche Weise ausgeparkt.
 
-### Aufgabe 5: Störungsaufgabe
+### Aufgabe 5: Störungsaufgabe (Code aktuell noch in Code-Cleanup Branch)
 
 - **Störungen ignorieren**: Das Fahrzeug filtert anhand von Linienposition, Liniendicke und Linienkrümmung (Eher Anstieg) Störungen von Fahrlinien
 - **Fehlende Linien**: Das Fahrzeug hält seine Fahrt auch, wenn die Fahrlinien fehlen sollten bis es wieder Fahrlinien findet
