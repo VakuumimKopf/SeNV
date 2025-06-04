@@ -4,7 +4,6 @@ from sensor_msgs.msg import CompressedImage
 import cv2
 import numpy as np
 from copy import copy
-from senv_interfaces.msg import Pic
 from cv_bridge import CvBridge
 import math
 from geometry_msgs.msg import Twist
@@ -15,6 +14,7 @@ class lane_detect(Node):
         super().__init__('lane_detect')
 
         #  Parameters
+        self.debug_mode = False
 
         #  Variables
         self.edges = None
@@ -36,14 +36,15 @@ class lane_detect(Node):
             qos_profile=qos_policy)
         self.subscription  # prevent unused variable warning
 
+        # create publisher for the driving command
         self.publisher_driver = self.create_publisher(Twist, 'driving', qos_profile=qos_policy)
 
         # create timers for lane detection
         self.lane_timer_period = 0.1
         self.lane_timer = self.create_timer(
             self.lane_timer_period, self.lane_detection)
-        
-        # create timers for drive
+
+        # create timers for drive logic
         self.drive_timer_period = 0.1
         self.drive_timer = self.create_timer(
             self.drive_timer_period, self.drive)
@@ -124,15 +125,13 @@ class lane_detect(Node):
         self.get_logger().info("Gui" + str(guiding_lines))
         if result is None:
             return
-        
+
         self.update_guiding_lines(guiding_lines)
         self.get_logger().info("Guiding Line: " + str(self.guiding_lines))
         result = self.draw_lane_lines(result, self.guiding_lines)
 
         cv2.imshow("Result", result)
         cv2.waitKey(1)
-
-        
 
     #  Filtering a set of lines based on lane widthe
     def filtering(self, lines: np.ndarray, last_lane_lines, num):
@@ -141,8 +140,8 @@ class lane_detect(Node):
         canvas = np.zeros_like(self.raw_image)
         pair_margin = 0.7
         max_x_distance = 100
-        min_intercept_distance = 8
-        max_intercept_distance = 27
+        min_intercept_distance = 10
+        max_intercept_distance = 24
 
         arr = []
         #  Calculate the slope, middle and intercept for all lines
@@ -240,6 +239,7 @@ class lane_detect(Node):
                 max = group[i][n]
         return max
 
+    #  Filter inside the groups for lines with a specific distance
     def filter_for_distance(self, groups, max_intercept_distance, min_intercept_distance):
         out = []
         for i in range(len(groups)):
@@ -254,9 +254,11 @@ class lane_detect(Node):
                     if min_intercept_distance <= distance <= max_intercept_distance:
                         new.append(line1)
                         new.append(line2)
+                        self.get_logger().info(str(distance))
             out.append(new)
         return out
 
+    #  Calculate the distance between two line segments
     def segments_distance(self, x11, y11, x12, y12, x21, y21, x22, y22):
         """ distance between two segments in the plane:
             one segment is (x11, y11) to (x12, y12)
@@ -272,6 +274,7 @@ class lane_detect(Node):
         distances.append(self.point_segment_distance(x22, y22, x11, y11, x12, y12))
         return min(distances)
 
+    #  Calculate if two lines intersect
     def segments_intersect(self, x11, y11, x12, y12, x21, y21, x22, y22):
         """ whether two segments in the plane intersect:
             one segment is (x11, y11) to (x12, y12)
@@ -288,6 +291,7 @@ class lane_detect(Node):
         t = (dx2 * (y11 - y21) + dy2 * (x21 - x11)) / (-delta)
         return (0 <= s <= 1) and (0 <= t <= 1)
 
+    #  Calculate the distance between a line and a point
     def point_segment_distance(self, px, py, x1, y1, x2, y2):
         dx = x2 - x1
         dy = y2 - y1
@@ -313,6 +317,7 @@ class lane_detect(Node):
 
         return math.hypot(dx, dy)
 
+    #  Calculate the y values of n segments
     def segment_info(self, image, n):
 
         segments = []
@@ -324,6 +329,7 @@ class lane_detect(Node):
 
         return segments
 
+    #  Split the original image into n different images, hiding the other part with a mask
     def spilter(self, image, segment_info):
 
         ignore_mask_color = 255
@@ -374,6 +380,7 @@ class lane_detect(Node):
         cv2.imshow("hough" + str(num), canvas)
         return lines
 
+    #  Draw Lines on a given image
     def draw_lane_lines(self, image, lines, color=[0, 0, 255], thickness=10):
 
         canvas = np.zeros_like(image)
@@ -386,6 +393,7 @@ class lane_detect(Node):
 
         return cv2.addWeighted(image, 1.0, canvas, 1.0, 0.0)
 
+    #  Calculate the lines of each side of the road
     def lane_lines(self, lines, segment_info):
         left_lane, right_lane = self.build_road_lines(lines)
         y1 = segment_info[0]
@@ -398,6 +406,7 @@ class lane_detect(Node):
             out.append([right_line[0][0], right_line[0][1], right_line[1][0], right_line[1][1]])
         return out
 
+    #  Sort all lines into right and left lines of the road and merge them
     def build_road_lines(self, lines):
 
         #  Parameters
@@ -462,6 +471,7 @@ class lane_detect(Node):
 
         return left_lane, right_lane
 
+    #  Calculate points from a function and return line as two points
     def pixel_points(self, y1, y2, line):
         if line is None:
             return None
@@ -472,6 +482,7 @@ class lane_detect(Node):
         y2 = int(y2)
         return ((x1, y1), (x2, y2))
 
+    #  Calculate the middle line of the round based on the lines on both sides
     def get_guiding_line(self, lines):
 
         if len(lines) == 2:
@@ -487,10 +498,11 @@ class lane_detect(Node):
             self.get_logger().info("Error in get_guiding_line")
             return None
 
+    #  Update the middle lines to prevent jumps, missing values and overall smooth the driving
     def update_guiding_lines(self, lines):
         old = self.guiding_lines
         if old is None:
-            self.guiding_lines = lines 
+            self.guiding_lines = lines
             return
         for i in range(len(lines)):
             if old[i] is None:
@@ -509,6 +521,7 @@ class lane_detect(Node):
 
         self.guiding_lines = lines
 
+    #  Calculate a Twist msg based on the middle line of the road
     def drive(self):
         self.get_logger().info("Test")
         lines = self.guiding_lines
@@ -534,10 +547,10 @@ class lane_detect(Node):
             if x_d > middle + area_long:
                 turn = -0.35
             else:
-                turn = -0.3        
+                turn = -0.3
         else:
             turn = 0.0
-        
+
         msg = Twist()
         msg.angular.z = turn
         msg.linear.x = 0.2*(1-abs(turn))
@@ -549,12 +562,8 @@ class lane_detect(Node):
 
 def main(args=None):
 
-    img = cv2.imread("/home/oliver/senv_ws/src/senv/senv/image2.png")
-
     rclpy.init(args=args)
     node = lane_detect()
-    #  node.image_callback(img)
-    #  node.lane_detection()
     cv2.waitKey(0)
 
     try:
