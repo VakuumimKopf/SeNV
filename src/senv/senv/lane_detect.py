@@ -52,8 +52,8 @@ class lane_detect(Node):
     # raw data formating routine
     def image_callback(self, data):
 
+        #  Get data from camera and convert to cv2 image
         img_cv = self.bridge.compressed_imgmsg_to_cv2(data, desired_encoding='passthrough')
-        #  img_cv = data
 
         #  Convert RGB image to greyscale
         greyscale = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
@@ -88,18 +88,17 @@ class lane_detect(Node):
         #  Calculating the y points of the wanted segments
         segment_info = self.segment_info(raw_image, number_parts)
 
-        #  Appling polygon mask to filter only for region of interest
+        #  Split the image in segments with a polygon mask and only use the region of interest
         regions = self.spilter(edges, segment_info)
 
-        #  Looping through all segments
+        #  Setup all loop variables and looping through all segments
         result = None
         last_lane_lines = None
         last_result = raw_image
         num = 0
         guiding_lines = [None, None, None]
-        for region in regions:
 
-            self.get_logger().info(str(num))
+        for region in regions:
 
             #  Appling hough transform returning set of found lines
             hough = self.hough_transform(region, num)
@@ -108,28 +107,31 @@ class lane_detect(Node):
             if hough is None:
                 continue
 
-            #  Filtering the found lines
+            #  Filtering the found lines on multiple factors
             filtered = self.filtering(hough, last_lane_lines, num)
 
             #  Calculating side lines of road
             lines = self.lane_lines(filtered, segment_info[num])
 
-            #  Calculating guiding lines
+            #  Calculating guiding lines in the middle of the road
             guiding_lines[num] = self.get_guiding_line(lines)
 
+            #  Draw the lane lines on the result image
             result = self.draw_lane_lines(last_result, lines)
+
+            #  Update the loop variables on the end of the loop
             last_result = result
             num = num + 1
 
         cv2.imshow("Used", self.canvas)
-        self.get_logger().info("Gui" + str(guiding_lines))
+
         if result is None:
             return
 
+        #  Update the guidling lines with a new value
         self.update_guiding_lines(guiding_lines)
-        self.get_logger().info("Guiding Line: " + str(self.guiding_lines))
-        result = self.draw_lane_lines(result, self.guiding_lines)
 
+        result = self.draw_lane_lines(result, self.guiding_lines)
         cv2.imshow("Result", result)
         cv2.waitKey(1)
 
@@ -141,7 +143,7 @@ class lane_detect(Node):
         pair_margin = 0.7
         max_x_distance = 100
         min_intercept_distance = 10
-        max_intercept_distance = 24
+        max_intercept_distance = 23
 
         arr = []
         #  Calculate the slope, middle and intercept for all lines
@@ -163,21 +165,20 @@ class lane_detect(Node):
         groupes = self.finding_groups(arr, pair_margin, max_x_distance)
 
         #  Draw Groups
-        for i in range(0, len(groupes)):
-            groupe = groupes[i]
-            color = list(np.random.random(size=3) * 256)
-            for j in range(0, len(groupe)):
-                line = groupe[j]
-                cv2.line(canvas, (line[0], line[1]), (line[2], line[3]), color, 3, cv2.LINE_AA)
-
-        cv2.imshow("canvas" + str(num), canvas)
+        if self.debug_mode is True:
+            for i in range(0, len(groupes)):
+                groupe = groupes[i]
+                color = list(np.random.random(size=3) * 256)
+                for j in range(0, len(groupe)):
+                    line = groupe[j]
+                    cv2.line(canvas, (line[0], line[1]), (line[2], line[3]), color, 3, cv2.LINE_AA)
+            cv2.imshow("canvas" + str(num), canvas)
 
         #  Filter each group so only lines at the right distance remain
         groupes = self.filter_for_distance(groupes, max_intercept_distance, min_intercept_distance)
-        #  self.get_logger().info("Abstände: " + str(f_groups))
 
         out = []
-        #  Combine Groups into np array
+        #  Combine Groups into array and throw away slope, intercept and middle
         for i in range(0, len(groupes)):
             groupe = groupes[i]
             for j in range(0, len(groupe)):
@@ -188,11 +189,11 @@ class lane_detect(Node):
     #  Group lines based on slope, pair_margin determines range of slope of a group
     def finding_groups(self, a, pair_margin, max_distance):
 
-        #  Variable
+        #  Variables
         out = []
         group = []
 
-        #  Iterate throuh whole list
+        #  Iterate through whole list
         for i in range(0, len(a)):
 
             #  Check if a new group, and if so just append the current element and continue
@@ -241,32 +242,40 @@ class lane_detect(Node):
 
     #  Filter inside the groups for lines with a specific distance
     def filter_for_distance(self, groups, max_intercept_distance, min_intercept_distance):
+
+        #  Variables
         out = []
+
         for i in range(len(groups)):
             group = groups[i]
             new = []
+
+            #  Check each group and compare each element to each other
             for j in range(len(group)):
                 for k in range(j+1, len(group)):
 
                     line1 = group[j]
                     line2 = group[k]
+
+                    #  Calculate the distance between the two line segments
                     distance = self.segments_distance(line1[0], line1[1], line1[2], line1[3], line2[0], line2[1], line2[2], line2[3])
+
+                    #  Check if the distance is in range, if so append both the lines to the new list
                     if min_intercept_distance <= distance <= max_intercept_distance:
                         new.append(line1)
                         new.append(line2)
-                        self.get_logger().info(str(distance))
+
             out.append(new)
         return out
 
     #  Calculate the distance between two line segments
     def segments_distance(self, x11, y11, x12, y12, x21, y21, x22, y22):
-        """ distance between two segments in the plane:
-            one segment is (x11, y11) to (x12, y12)
-            the other is   (x21, y21) to (x22, y22)
-        """
+
+        #  Check if the two lines intersect
         if self.segments_intersect(x11, y11, x12, y12, x21, y21, x22, y22):
             return 0
-        # try each of the 4 vertices w/the other segment
+
+        #  Try each of the 4 vertices with the other segment and select the min
         distances = []
         distances.append(self.point_segment_distance(x11, y11, x21, y21, x22, y22))
         distances.append(self.point_segment_distance(x12, y12, x21, y21, x22, y22))
@@ -276,10 +285,6 @@ class lane_detect(Node):
 
     #  Calculate if two lines intersect
     def segments_intersect(self, x11, y11, x12, y12, x21, y21, x22, y22):
-        """ whether two segments in the plane intersect:
-            one segment is (x11, y11) to (x12, y12)
-            the other is   (x21, y21) to (x22, y22)
-        """
         dx1 = x12 - x11
         dy1 = y12 - y11
         dx2 = x22 - x21
@@ -293,8 +298,10 @@ class lane_detect(Node):
 
     #  Calculate the distance between a line and a point
     def point_segment_distance(self, px, py, x1, y1, x2, y2):
+
         dx = x2 - x1
         dy = y2 - y1
+
         if dx == dy == 0:  # the segment's just a point
             return math.hypot(px - x1, py - y1)
 
@@ -320,11 +327,14 @@ class lane_detect(Node):
     #  Calculate the y values of n segments
     def segment_info(self, image, n):
 
+        #  Parameter to determine interessting part of image
+        cut = 0.4
+
         segments = []
         rows, cols = image.shape[:2]
         for i in range(0, n):
-            bottom = (rows - (i/n * rows * 0.4))
-            top = rows * 0.6 + ((n-i-1) / n * rows * 0.4)
+            bottom = (rows - (i/n * rows * cut))
+            top = rows * 0.6 + ((n-i-1) / n * rows * cut)
             segments.append([bottom, top])
 
         return segments
@@ -350,10 +360,10 @@ class lane_detect(Node):
 
             masked_images.append(cv2.bitwise_and(image, mask))
 
-        num = 0
-        for masked_image in masked_images:
-            cv2.imshow("masked" + str(num), masked_image)
-            num = num + 1
+        #  Draw masked canny image
+        if self.debug_mode is True:
+            for i in range(len(masked_images)):
+                cv2.imshow("masked" + str(i), masked_images[i])
 
         return masked_images
 
@@ -372,12 +382,15 @@ class lane_detect(Node):
 
         canvas = copy(self.raw_image)
 
-        if lines is not None:
-            for i in range(0, len(lines)):
-                line = lines[i][0]
-                cv2.line(canvas, (line[0], line[1]), (line[2], line[3]), (0, 0, 255), 3, cv2.LINE_AA)
+        #  Draw found hough lines on image
+        if self.debug_mode is True:
+            if lines is not None:
+                for i in range(0, len(lines)):
+                    line = lines[i][0]
+                    cv2.line(canvas, (line[0], line[1]), (line[2], line[3]), (0, 0, 255), 3, cv2.LINE_AA)
 
-        cv2.imshow("hough" + str(num), canvas)
+            cv2.imshow("hough" + str(num), canvas)
+
         return lines
 
     #  Draw Lines on a given image
@@ -395,15 +408,20 @@ class lane_detect(Node):
 
     #  Calculate the lines of each side of the road
     def lane_lines(self, lines, segment_info):
+
+        #  Get a function for each road side
         left_lane, right_lane = self.build_road_lines(lines)
+
         y1 = segment_info[0]
         y2 = segment_info[1]
         left_line = self.pixel_points(y1, y2, left_lane)
         right_line = self.pixel_points(y1, y2, right_lane)
         out = []
+
         if left_line is not None and right_line is not None:
             out.append([left_line[0][0], left_line[0][1], left_line[1][0], left_line[1][1]])
             out.append([right_line[0][0], right_line[0][1], right_line[1][0], right_line[1][1]])
+
         return out
 
     #  Sort all lines into right and left lines of the road and merge them
@@ -429,25 +447,14 @@ class lane_detect(Node):
             x2 = line[2]
             y2 = line[3]
 
-            #  Ignore all Vertical lines
-            if x1 == x2:
-                continue
-
+            #  Calculate the middle, slope, intercept and length
             middle_of_line = (x1 + x2) / 2
-
-            # Calculating slope of a line
             slope = (y2 - y1) / (x2 - x1)
-
-            # Calculating weigth dependent of the distance to the middle
-            # weigth = 1 - (abs(((x1 + x2) / 2) - middle) / middle)
-
-            # Calculating intercept of a line
             intercept = y1 - (slope * x1)
-
-            # Calculating length of a line
             length = np.sqrt(((y2 - y1) ** 2) + ((x2 - x1) ** 2))
 
-            # slope of left lane is negative and for right lane slope is positive
+            #  slope of left lane is negative and for right lane slope is positive,
+            #  but only append when the side is matching the slope
             if slope < -(filter_value_straight_lines):
                 if middle_of_line <= middle:
                     left_lines.append((slope, intercept))
@@ -495,24 +502,29 @@ class lane_detect(Node):
 
             return [x1, y1, x2, y2]
         else:
-            self.get_logger().info("Error in get_guiding_line")
             return None
 
     #  Update the middle lines to prevent jumps, missing values and overall smooth the driving
     def update_guiding_lines(self, lines):
+
         old = self.guiding_lines
+
         if old is None:
             self.guiding_lines = lines
             return
+
         for i in range(len(lines)):
+
             if old[i] is None:
                 lines[i] = lines[i]
+
             elif lines[i] is None:
                 lines[i] = old[i]
+
             else:
                 x1_c = old[i][0] - lines[i][0]
                 x2_c = old[i][2] - lines[i][2]
-                self.get_logger().info(str([x1_c, x2_c]))
+
                 if abs(x1_c) > 50 or abs(x2_c > 50):
                     lines[i][0] = round((old[i][0] + lines[i][0]) / 2)
                     lines[i][2] = round((old[i][2] + lines[i][2]) / 2)
@@ -523,21 +535,23 @@ class lane_detect(Node):
 
     #  Calculate a Twist msg based on the middle line of the road
     def drive(self):
-        self.get_logger().info("Test")
-        lines = self.guiding_lines
-        if lines is None:
-            return
-        if lines[0] is None:
-            return
-        x1 = lines[0][0]
-        x2 = lines[0][2]
 
-        x_d = (x1 + x2) / 2
-
+        #  Parameters
         middle = 320
         area_short = 15
         area_long = 35
-        turn = 0.0
+
+        lines = self.guiding_lines
+
+        if lines is None or lines[0] is None:
+            return
+
+        #  Calculate middle of the line
+        x1 = lines[0][0]
+        x2 = lines[0][2]
+        x_d = (x1 + x2) / 2
+
+        #  Determine Turn Value
         if x_d < middle - area_short:
             if x_d < middle - area_long:
                 turn = 0.35
@@ -551,12 +565,12 @@ class lane_detect(Node):
         else:
             turn = 0.0
 
+        speed = 0.2*(1-abs(turn))
+
+        #  Create Twist Message and publish
         msg = Twist()
         msg.angular.z = turn
-        msg.linear.x = 0.2*(1-abs(turn))
-        self.get_logger().info(str(0.2*(1-abs(turn))))
-
-        self.get_logger().info("Test: " + str(msg))
+        msg.linear.x = speed
         self.publisher_driver.publish(msg)
 
 
