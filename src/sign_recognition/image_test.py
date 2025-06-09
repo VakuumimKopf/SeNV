@@ -1,23 +1,24 @@
 from ultralytics import YOLO
+import cv2
 
 
-# Modell laden
-model = YOLO("sign_recognition/best2.0.pt")  # z. B. "./yolo_model/best.pt"
+# load model
+model = YOLO("senv/best3.0.pt")  # z. B. "./yolo_model/best.pt"
 
-# Bildpfad (ersetzen durch dein Bild)
-img_path = "sign_recognition/test.jpg"
+# image path
+img_path = "sign_recognition/schild.jpg"
+# left.jpg, right.jpg, straight.jpg, cross.jpg, park.jpg
+# prediction/inference
+results = model.predict(img_path)
 
-# Vorhersage (Inferenz)
-results = model(img_path)  # kann auch save=True sein
-
-# Klassenliste aus dem Modell (die Namen müssen mit deinem `data.yaml`
-# übereinstimmen!)
+# classlist of model must be same as in training
 class_names = model.names
 
-# IDs der erkannten Klassen (z. B. 0, 1, 2 …)
+# id of detected objects
 class_ids = results[0].boxes.cls.cpu().numpy().astype(int)
 
-# Umwandeln in Namen
+# transform class ids to class names
 detected_labels = [class_names[i] for i in class_ids]
 
 print("Erkannte Schilder:", detected_labels[0])
+cv2.imwrite("Erkannte_Schilder.jpg", results[0].plot())

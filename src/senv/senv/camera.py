@@ -12,7 +12,7 @@ from ultralytics import YOLO
 # pip install yolov8
 # load model
 # change the path to your model found in senv as best.pt
-model = YOLO("senv/best.pt")  # z. B. "./yolo_model/best.pt"
+model = YOLO("senv/best3.0.pt")  # z. B. "./yolo_model/best.pt"
 
 
 class camera(Node):
@@ -85,7 +85,7 @@ class camera(Node):
             self.line_timer_period, self.line_detection)
 
         self.status = ""
-        self.sign_timer_period = 0.5
+        self.sign_timer_period = 0.1  # MAYBE CHANGE
         self.sign_timer = self.create_timer(
             self.sign_timer_period, self.sign_handler)
 
@@ -350,24 +350,20 @@ class camera(Node):
 
             # when there is no sign detected, the list is empty
             if detected_labels == []:
-                # self.get_logger().info("No sign detected")
                 return ""
+
+            # DEBUG  prints all detected signs
+            # print("Erkannte Schilder:", detected_labels)
+
+            # annotated_image giving an array with the detected signs
+            annotated_image = results[0].plot()
+            # Bild anzeigen mit OpenCV
+            cv2.imshow("YOLOv8-Erkennung", annotated_image)
+            cv2.waitKey(1)
             return detected_labels[0]
+
         else:
             return ""
-        """
-        # DEBUG printet alle erkannten Schilder und zeigt Rahmen um diese
-
-        print("Erkannte Schilder:", detected_labels)
-        # Annotiertes Bild aus dem Ergebnis holen
-        annotated_image = results[0].plot()  # Gibt ein NumPy-Array zurück
-
-        # Bild anzeigen mit OpenCV
-        cv2.imshow("YOLOv8-Erkennung", annotated_image)
-        cv2.waitKey(1)
-        """
-
-        # return first detected label
 
 
 def main(args=None):
