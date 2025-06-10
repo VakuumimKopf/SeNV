@@ -47,7 +47,6 @@ class camera(Node):
         self.bridge = CvBridge()
         self.hsv = np.array([])
         self.waitingforgreen = False
-        self.img_row = np.random.randint(0, 256, 640, dtype=np.uint8)
 
         # definition of the QoS in order to receive data despite WiFi
         qos_policy = rclpy.qos.QoSProfile(
