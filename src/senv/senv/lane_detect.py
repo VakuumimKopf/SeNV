@@ -6,7 +6,7 @@ import numpy as np
 from copy import copy
 from cv_bridge import CvBridge
 import math
-from geometry_msgs.msg import Twist
+from senv_interfaces.msg import Lane
 
 
 class lane_detect(Node):
@@ -37,17 +37,12 @@ class lane_detect(Node):
         self.subscription  # prevent unused variable warning
 
         # create publisher for the driving command
-        self.publisher_driver = self.create_publisher(Twist, 'driving', qos_profile=qos_policy)
+        self.publisher_ = self.create_publisher(Lane, 'lane', qos_profile=qos_policy)
 
         # create timers for lane detection
         self.lane_timer_period = 0.1
         self.lane_timer = self.create_timer(
             self.lane_timer_period, self.lane_detection)
-
-        # create timers for drive logic
-        self.drive_timer_period = 0.1
-        self.drive_timer = self.create_timer(
-            self.drive_timer_period, self.drive)
 
     # raw data formating routine
     def image_callback(self, data):
@@ -123,8 +118,6 @@ class lane_detect(Node):
             last_result = result
             num = num + 1
 
-        cv2.imshow("Used", self.canvas)
-
         if result is None:
             return
 
@@ -132,8 +125,18 @@ class lane_detect(Node):
         self.update_guiding_lines(guiding_lines)
 
         result = self.draw_lane_lines(result, self.guiding_lines)
-        cv2.imshow("Result", result)
-        cv2.waitKey(1)
+
+        if self.debug_mode is True:
+            cv2.imshow("Used", self.canvas)
+            cv2.imshow("Result", result)
+            cv2.waitKey(1)
+
+        msg = Lane()
+        msg.gline_a = self.guiding_lines[0]
+        msg.gline_b = self.guiding_lines[1]
+        msg.gline_c = self.guiding_lines[2]
+
+        self.publisher_.publish
 
     #  Filtering a set of lines based on lane widthe
     def filtering(self, lines: np.ndarray, last_lane_lines, num):
@@ -533,7 +536,7 @@ class lane_detect(Node):
 
         self.guiding_lines = lines
 
-    #  Calculate a Twist msg based on the middle line of the road
+    """#  Calculate a Twist msg based on the middle line of the road
     def drive(self):
 
         #  Parameters
@@ -566,12 +569,7 @@ class lane_detect(Node):
             turn = 0.0
 
         speed = 0.2*(1-abs(turn))
-
-        #  Create Twist Message and publish
-        msg = Twist()
-        msg.angular.z = turn
-        msg.linear.x = speed
-        self.publisher_driver.publish(msg)
+    """
 
 
 def main(args=None):

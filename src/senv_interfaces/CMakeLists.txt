@@ -13,6 +13,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/ConTask.action"
   "msg/Laser.msg"
   "msg/Pic.msg"
+  "msg/Lane.msg"
 )
 
 ament_export_dependencies(rosidl_default_runtime)
