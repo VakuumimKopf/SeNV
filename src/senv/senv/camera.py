@@ -6,7 +6,9 @@ import cv2 as cv2
 import numpy as np
 from senv_interfaces.msg import Pic
 from senv.description import float_desc, int_desc, bool_desc, light_int_desc
-
+# imports for image_saving
+# import time
+# import os
 # Import ultralytics for sign detection with "pip install ultralytics"
 from ultralytics import YOLO
 # pip install yolov8
@@ -85,14 +87,16 @@ class camera(Node):
             self.line_timer_period, self.line_detection)
 
         self.status = ""
-        self.sign_timer_period = 0.1  # MAYBE CHANGE
+        self.sign_timer_period = 0.5 # MAYBE CHANGE
         self.sign_timer = self.create_timer(
             self.sign_timer_period, self.sign_handler)
 
         # create variables for sign detection
         self.img = []
-        # self.start_time = time.time()
         # Start time for image saving (timestamp for easier differentiation)
+        # self.start_time = time.time()
+
+        # create variables for detect_human (template matching)
 
     # raw data formating routine
     def image_callback(self, data):
@@ -176,7 +180,8 @@ class camera(Node):
 
         # return the first value of the detected_labels array in sign_identification
         sign_status = self.sign_identification()
-
+        # use image_saving only if necessary
+        # self.image_saving()
         if (sign_status != ""):
             self.status = sign_status
 
@@ -279,7 +284,7 @@ class camera(Node):
         return status
 
     # Use following function to create dataset of raw images
-    """
+    '''
     def image_saving(self):
         # Save the image to a file.
 
@@ -298,8 +303,11 @@ class camera(Node):
         # directory = "/home/lennart/ros2_ws/src/senv/Images/crosswalk"
         # sign = "crosswalk"
         # 4 output
-        directory = "/home/lennart/ros2_ws/src/senv/Images/park"
-        sign = "park"
+        # directory = "/home/lennart/ros2_ws/src/senv/Images/park"
+        # sign = "park"
+        # template output
+        directory = "/home/lennart/ros2_ws/src"
+        sign = "human"
 
         # Get the current time
         current_time = self.get_clock().now().to_msg()
@@ -319,21 +327,21 @@ class camera(Node):
         print("After saving image:")
 
         print(f'Successfully saved {time_str}')
-
+        sek = 1
         elapsed_time = time.time() - self.start_time
-        if elapsed_time > 32:
+        if elapsed_time > sek:
             self.get_logger().info("32 Sekunden erreicht – Programm wird beendet.")
             rclpy.shutdown()
         return ""
-    """
-
+'''
 # sign identification
-
     def sign_identification(self):
         """
         Predict the class of an image using a pre-trained model.
         """
         if self.img != []:
+            # threshhold/least confidence of detected signs
+            threshhold = 0.8
             # get the image from the camera as np.array
             image = self.bridge.compressed_imgmsg_to_cv2(self.img, desired_encoding='passthrough')
             # Prediction (Inference)
@@ -344,22 +352,40 @@ class camera(Node):
 
             # IDs of the detected classes (e.g. 0, 1, 2 …)
             class_ids = results[0].boxes.cls.cpu().numpy().astype(int)
+            # Bounding boxes: [x1, y1, x2, y2], neccesary for filtered sign display in the image
+            xyxy = results[0].boxes.xyxy.cpu().numpy()
 
-            # Change labels to names
-            detected_labels = [class_names[i] for i in class_ids]
+            # folter for signs with a probability of at least 0.8
+            high_conf_indices = [i for i, conf in enumerate(results[0].boxes.conf.cpu().numpy())
+                                 if conf > threshhold]
 
+            # if there is no sign with at least 80% recognition
+            if not high_conf_indices:
+                return ""
+            # Display signs with over 80% in another image
+            '''
+            # manual display of filtered signs
+            for i in high_conf_indices:
+                x1, y1, x2, y2 = map(int, xyxy[i])
+                label = f"{class_names[class_ids[i]]}: {results[0].boxes.conf.cpu().numpy()[i]:.2f}"
+
+                # Zeichne Rechteck
+                cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 0), 2)
+                # Zeichne Label
+                cv2.putText(image, label, (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+
+            # Zeige das bearbeitete Bild mit nur den gefilterten Erkennungen
+            cv2.imshow("YOLOv8-Erkennung (Confidence > 0.8)", image)
+            cv2.waitKey(1)
+            '''
+
+            filtered_class_ids = [class_ids[i] for i in high_conf_indices]
+            detected_labels = [class_names[i] for i in filtered_class_ids]
             # when there is no sign detected, the list is empty
             if detected_labels == []:
                 return ""
-
-            # DEBUG  prints all detected signs
-            # print("Erkannte Schilder:", detected_labels)
-
-            # annotated_image giving an array with the detected signs
-            annotated_image = results[0].plot()
-            # Bild anzeigen mit OpenCV
-            cv2.imshow("YOLOv8-Erkennung", annotated_image)
-            cv2.waitKey(1)
+            # self.get_logger().info(f"Detected Sign is {detected_labels}")
             return detected_labels[0]
 
         else:

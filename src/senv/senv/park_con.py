@@ -163,13 +163,6 @@ class park_con(Node):
     def laser_callback(self, msg):
         if self.turned_on is False:
             return
-        # Define your callback function here
-        front_spot_dist = self.get_parameter(
-                    'front_parkingspot_distance').get_parameter_value().double_value
-        left_spot_dist = self.get_parameter(
-                    'left_parkingspot_distance').get_parameter_value().double_value
-        right_spot_dist = self.get_parameter(
-                     'right_parkingspot_distance').get_parameter_value().double_value
         # self.get_logger().info('Received message laser')
         self.right_distance = msg.right_distance
         if msg.right_distance < 0.2 and msg.right_distance != 0.0:
@@ -298,8 +291,6 @@ class park_con(Node):
             self.wait_ros2(5)
             self.depark("backwards")
             return
-        
-        
         '''
         self.laneholding_for_duration(9.7, 0.1)
         self.get_logger().info("Done with Laneholding")

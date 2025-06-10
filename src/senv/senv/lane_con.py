@@ -39,6 +39,7 @@ class lane_con(Node):
         self.last_laser_msg = 0.0
         # Action trigger parameter
         self.park_con_triggers = ["Park"]
+        self.cross_con_triggers = ["crosswalk"]
         self.intersection_con_triggers = ["left", "right", "straight"]
 
         # Qos policy setting
@@ -79,6 +80,12 @@ class lane_con(Node):
             self,
             ConTask,
             "obstacle_task"
+        )
+
+        self.crosswalk_client = ActionClient(
+            self,
+            ConTask,
+            "crosswalk_task"
         )
 
         # Topics to publish to
@@ -145,7 +152,7 @@ class lane_con(Node):
             self.get_logger().info("Waiting for start signal")
             self.wait_at_start += 1
             return
-            
+
         # Ensure laser message is available
         if self.last_laser_msg is None:
             self.get_logger().info("No laser message received yet")
@@ -197,6 +204,19 @@ class lane_con(Node):
 
             # Update state
             self.update_node_state("parking")
+            return
+
+        elif last_pic_msg.sign in self.cross_con_triggers:
+            self.get_logger().info("Übergeben an crosswalk_con")
+
+            # send action to crosswalk_con
+            self.send_goal(True, self.crosswalk_client)
+
+            # stop controll
+            self.is_turned_on = False
+
+            # Update state
+            self.update_node_state("crosswalking")
             return
 
         elif last_pic_msg.sign in self.intersection_con_triggers:
