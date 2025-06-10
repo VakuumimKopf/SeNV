@@ -5,59 +5,46 @@ from cv_bridge import CvBridge
 import cv2 as cv2
 import numpy as np
 from senv_interfaces.msg import Pic
-from senv.description import float_desc, int_desc, bool_desc, light_int_desc
+from senv.description import light_int_desc
 
 # Import ultralytics for sign detection with "pip install ultralytics"
 from ultralytics import YOLO
+
 # load model
-# change the path to your model found in senv as best.pt
-model = YOLO("/home/lennart/ros2_ws/src/senv/best.pt")  # z. B. "./yolo_model/best.pt"
+model = YOLO("./yolo_model/best.pt")
 
 
 class camera(Node):
     def __init__(self):
         super().__init__('camera')
 
-        # Define Parameters 
-
-        self.declare_parameter('boundary_left', 100)
-        # 200 für 640px, 100 für 320
-        self.declare_parameter('boundary_right', 630)
-        # 440 für 640px, 220 für 320px
-        self.declare_parameter('light_lim', 100, float_desc("Lichtintensität Grenzwert"))
-        self.declare_parameter('min_area', 50, int_desc("Minimale Fläche für Ampelerkennung"))
-        self.declare_parameter('max_area', 300, int_desc("Maximale Fläche für Ampelerkennung"))
         # Dynmaische Paramter für RotFarbgrenzen 1
         self.declare_parameter('low1red_color', 0, light_int_desc("Rot Farbwert Untere Grenze 1"))
         self.declare_parameter('low1red_sat', 100, light_int_desc("Rot Saturation Untere Grenze 1"))
-        self.declare_parameter('low1red_alpha', 100,
-                               light_int_desc("Rot Helligkeit Untere Grenze 1"))
-        
+        self.declare_parameter('low1red_alpha', 100, light_int_desc("Rot Helligkeit Untere Grenze 1"))
         self.declare_parameter('up1red_color', 10, light_int_desc("Rot Farbwert Obere Grenze 1"))
         self.declare_parameter('up1red_sat', 255, light_int_desc("Rot Saturation Obere Grenze 1"))
         self.declare_parameter('up1red_alpha', 255, light_int_desc("Rot Helligkeit Obere Grenze 1"))
+
         # Dynmaische Paramter für RotFarbgrenzen 2
         self.declare_parameter('low2red_color', 160, light_int_desc("Rot Farbwert Untere Grenze 2"))
         self.declare_parameter('low2red_sat', 100, light_int_desc("Rot Saturation Untere Grenze 2"))
-        self.declare_parameter('low2red_alpha', 100, light_int_desc("Rot Helligkeit Untere Grenze 2"
-                                                                    ))
+        self.declare_parameter('low2red_alpha', 100, light_int_desc("Rot Helligkeit Untere Grenze 2"))
         self.declare_parameter('up2red_color', 179, light_int_desc("Rot Farbwert Obere Grenze 2"))
         self.declare_parameter('up2red_sat', 255, light_int_desc("Rot Saturation Obere Grenze 2"))
         self.declare_parameter('up2red_alpha', 255, light_int_desc("Rot Helligkeit Obere Grenze 2"))
+
         # Dynmaische Paramter für Grüne Farbgrenzen
         self.declare_parameter('lowgreen_color', 50, light_int_desc("Grün Farbwert Untere Grenze"))
         self.declare_parameter('lowgreen_sat', 150, light_int_desc("Grün Saturation Untere Grenze"))
-        self.declare_parameter('lowgreen_alpha', 50, light_int_desc("Grün Helligkeit Untere Grenze"
-                                                                    ))
+        self.declare_parameter('lowgreen_alpha', 50, light_int_desc("Grün Helligkeit Untere Grenze"))
         self.declare_parameter('upgreen_color', 85, light_int_desc("Grün Farbwert Obere Grenze"))
         self.declare_parameter('upgreen_sat', 255, light_int_desc("Grün Saturation Obere Grenze"))
         self.declare_parameter('upgreen_alpha', 255, light_int_desc("Grün Helligkeit Obere Grenze"))
 
+        # Variables
+        self.raw_image
         self.bridge = CvBridge()
-        self.status = ""
-        self.last_spin = False  # False is gegen UHrzeigersinn, True is mit Uhrzeigersinn
-
-        self.line_pos = 0
         self.hsv = np.array([])
         self.waitingforgreen = False
         self.img_row = np.random.randint(0, 256, 640, dtype=np.uint8)
@@ -79,43 +66,24 @@ class camera(Node):
         self.publisher_ = self.create_publisher(Pic, 'pic', 1)
 
         # create timers for data handling
-        self.line_timer_period = 0.1
-        self.line_timer = self.create_timer(
-            self.line_timer_period, self.line_detection)
-
-        self.status = ""
         self.sign_timer_period = 0.5
         self.sign_timer = self.create_timer(
             self.sign_timer_period, self.sign_handler)
 
-        # create variables for sign detection
-        self.img = []
-        # self.start_time = time.time()  
-        # Start time for image saving (timestamp for easier differentiation)
-
     # raw data formating routine
     def image_callback(self, data):
 
-        # Get needed parameters
-        boundary_left = self.get_parameter('boundary_left').get_parameter_value().integer_value
-        boundary_right = self.get_parameter('boundary_right').get_parameter_value().integer_value
-        light_lim = self.get_parameter('light_lim').get_parameter_value().integer_value
-
-        # Eingang roh daten werden gefiltert und es wird der ein Int Array
-        # gespeichert unter self.img_row abgelegt um dann in line_detection gepublisht zu werden
+        #  Converting raw data into np.array
 
         img_cv = self.bridge.compressed_imgmsg_to_cv2(data, desired_encoding='passthrough')
 
         # just the image for later use (in sign_identification)
-        self.img = data
+        self.raw_image = img_cv
 
         # convert image to grayscale
         height, width, _ = img_cv.shape
-        img_gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
-        img_row = img_gray[height-9, :]
 
         # Speichere HSV für farbanalyse in sign detection
-
         # Bereich: rechtes Drittel, mittleres Drittel vertikal
         x_start = width * 2 // 3
         x_end = width
@@ -129,64 +97,29 @@ class camera(Node):
         else:
             self.hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
 
-        # Formating data
-        img_row = img_row[boundary_left:boundary_right]
-
-        # 20 greatest items sorted
-        img_row_sorted = np.argsort(img_row)[-20:]
-
-        # Values of 20 greatest items
-        largest_values = img_row[img_row_sorted]
-
-        # Index des mittleren Wertes der 20 größten im Teil-Array
-        middle_index_in_subset = np.argsort(largest_values)[len(largest_values) // 2]
-
-        # Index des mittleren Wertes im Original-Array
-        middle_index_in_original = img_row_sorted[middle_index_in_subset]
-        self.line_pos = 0
-        # Hellstes Element
-        brightest = max(img_row)
-        if brightest > light_lim:
-            self.line_pos = middle_index_in_original + boundary_left
-        # show image
-        # cv2.imshow("IMG_ROW", img_row)
-        cv2.imshow("IMG", img_cv)
-        cv2.waitKey(1)
-
-    # line detection in formated data
-    def line_detection(self):
-        # self.get_logger().info("line_detection gestartet")
-
-        # Nachricht veröffentlichen
-        msg = Pic()
-        if self.waitingforgreen is True:
-            self.status = "red light"
-        msg.sign = self.status
-        # self.get_logger().info(msg.sign)
-        msg.line = int(self.line_pos)
-        # self.get_logger().info(msg.line)
-
-        self.publisher_.publish(msg)
-
-    # sign detection in fomated data
+    # starts sign and light detection and publishes result
     def sign_handler(self):
 
         light_status = self.light_detection()
-
-        # return the first value of the detected_labels array in sign_identification
         sign_status = self.sign_identification()
 
+        # If light and sign are detected prefer sign
         if (sign_status != ""):
-            self.status = sign_status
+            status = sign_status
 
         elif (light_status != ""):
-            self.status = light_status
+            status = light_status
 
         else:
-            self.status = ""
+            status = ""
+
+        msg = Pic()
+        msg.status = status
+        self.publisher_.publish(msg)
 
     def light_detection(self):
 
+        #  Get Parameters
         min_area = self.get_parameter('min_area').get_parameter_value().integer_value
         max_area = self.get_parameter('max_area').get_parameter_value().integer_value
         low1red_color = self.get_parameter('low1red_color').get_parameter_value().integer_value
@@ -216,6 +149,7 @@ class camera(Node):
         if (hsv.size == 0):
             status = ""
             return
+
         # Function for signs - string for Outputs("")
         # min_area = 30  # Minimale fläche für rotes licht
         # Farbgrenzen für rot
@@ -270,12 +204,12 @@ class camera(Node):
         if max_green_area >= max_red_area and max_green_area > 0:
             status = 'green light'
             self.waitingforgreen = False
-        self.status = status
+
         cv2.imshow("IMG_red", red_mask)
         cv2.imshow("IMG_green", green_mask)
         cv2.waitKey(1)
 
-        return ""
+        return status
 
     # Use following function to create dataset of raw images
     """
@@ -326,14 +260,11 @@ class camera(Node):
         return ""
     """
 
-# sign identification
-
+    # Predict the class of an image using a pre-trained model
     def sign_identification(self):
-        """
-        Predict the class of an image using a pre-trained model.
-        """
-        # get the image from the camera as np.array
-        image = self.bridge.compressed_imgmsg_to_cv2(self.img, desired_encoding='passthrough')
+
+        image = self.raw_image
+
         # Prediction (Inference)
         results = model(image, verbose=False)  # kann auch save=True sein
 
@@ -378,7 +309,7 @@ def main(args=None):
 
     finally:
         node.destroy_node()
-        print('Shutting Down Camera')
+        print('Shutting Down Camera Node')
 
 
 if __name__ == '__main__':
