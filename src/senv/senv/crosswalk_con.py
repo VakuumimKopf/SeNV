@@ -9,8 +9,14 @@ from std_msgs.msg import String
 from senv.stopper import Stopper
 import time
 from senv.description import float_desc, int_desc, light_int_desc, bool_desc
+from sensor_msgs.msg import CompressedImage
 import cv2
+from cv_bridge import CvBridge
 import numpy as np
+
+# model for detecting human near crosswalk
+from ultralytics import YOLO
+model = YOLO("senv/human.pt")
 
 
 class crosswalk_con(Node):
@@ -48,9 +54,18 @@ class crosswalk_con(Node):
             "crosswalk_task",
             self.execute_callback
         )
-        self.publisher_driver = self.create_publisher(Twist, 'driving', qos_profile=qos_policy)
+        # create subscribers for image data with changed qos
+        self.subscription = self.create_subscription(
+            CompressedImage,
+            '/image_raw/compressed',
+            self.image_callback,
+            qos_profile=qos_policy)
+        self.subscription  # prevent unused variable warning
 
-        self.template = cv2.imread('human.jpg', cv2.IMREAD_GRAYSCALE)
+        self.bridge = CvBridge()
+        self.img = []
+
+        self.publisher_driver = self.create_publisher(Twist, 'driving', qos_profile=qos_policy)
 
     def execute_callback(self, goal_handle: ServerGoalHandle):
 
@@ -85,39 +100,72 @@ class crosswalk_con(Node):
         self.get_logger().info('Received message laser')
         # obstacle avoidance
 
-    def datahandler(self):
-        self.get_logger().info("Handling crosswalk data")
-        stopmsg = Twist()
-        stopmsg.angular.z = 0
-        stopmsg.angular.x = 0
-        self.get_logger().info("Suche nach Mensch")
-        human_there = self.detect_human()
-        if human_there:
-            self.get_logger().info("Mensch wartet am Zebrastreifen")
-            self.publisher_driver.publish(stopmsg)
-        else:
-            pass
+    # raw data formating routine
+    def image_callback(self, data):
+        self.img = data
 
+    def datahandler(self):
+        while True:
+            self.get_logger().info("Handling crosswalk data")
+            stopmsg = Twist()
+            stopmsg.angular.z = 0.0
+            stopmsg.angular.x = 0.0
+            self.get_logger().info("Suche nach Mensch")
+
+            # returns bool (if human -> True)
+            human_there = self.detect_human()
+
+            while human_there:
+                self.get_logger().info("Mensch wartet am Zebrastreifen")
+                self.publisher_driver.publish(stopmsg)
+                human_still_there = self.detect_human()
+                # if the human hasnt been removed
+                if human_still_there:
+                    human_there = False
+            # if there is no human
+            else:
+                # driverlogic here
+                pass
+
+    # detect human
     def detect_human(self):
-        human = False
+        """
+        Predict the class of an image using a pre-trained model. DO NOT USE cv2.imshow IN HERE OR IT WONT WORK
+        """
         if self.img != []:
+            # threshhold/least confidence of detected signs
+            threshhold = 0.8
             # get the image from the camera as np.array
             image = self.bridge.compressed_imgmsg_to_cv2(self.img, desired_encoding='passthrough')
-            image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            template = self.template
-            w, h = template.shape[::-1]
-            res = cv2.matchTemplate(image_gray, template, cv2.TM_CCOEFF_NORMED)
-            threshhold = 0.8
-            loc = np.where(res >= threshhold)
-            for pt in zip(*loc[::-1]):
-                cv2.rectangle(image, pt, (pt[0] + w, pt[1] + h), (0, 255, 255), 2)
-            cv2.imshow('Detected Human', image)
-            if len(loc) != 0:
-                human = True
+            # Prediction (Inference)
+            results = model(image, verbose=False)  # kann auch save=True sein
+
+            # classlist from model (the names must match your `data.yaml`)
+            class_names = model.names
+
+            # IDs of the detected classes (e.g. 0, 1, 2 …)
+            class_ids = results[0].boxes.cls.cpu().numpy().astype(int)
+            # x and y coordinates of the bounding boxes, might be used later on for filtering small humans in signs
+            # xyxy = results[0].boxes.xyxy.cpu().numpy()
+
+            # folter for signs with a probability of at least 0.8
+            high_conf_indices = [i for i, conf in enumerate(results[0].boxes.conf.cpu().numpy())
+                                 if conf > threshhold]
+            # if there is no sign with at least 80% recognition
+            if not high_conf_indices:
+                return ""
+
+            filtered_class_ids = [class_ids[i] for i in high_conf_indices]
+            detected_labels = [class_names[i] for i in filtered_class_ids]
+            # when there is no sign detected, the list is empty
+            if detected_labels == []:
+                return False
+            # self.get_logger().info(f"Detected Sign is {detected_labels}")
+            else:
+                return True
+
         else:
             return ""
-
-        return human
 
 
 def main(args=None):

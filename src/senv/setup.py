@@ -32,6 +32,7 @@ setup(
             'camera = senv.camera:main',
             'laserscanner = senv.laserscanner:main',
             'obstacle_con = senv.obstacle_con:main',
+            'crosswalk_con = senv.crosswalk_con:main',
         ],
     },
 )

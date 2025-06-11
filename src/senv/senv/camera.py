@@ -13,8 +13,7 @@ from senv.description import float_desc, int_desc, bool_desc, light_int_desc
 from ultralytics import YOLO
 # pip install yolov8
 # load model
-# change the path to your model found in senv as best.pt
-model = YOLO("senv/best3.0.pt")  # z. B. "./yolo_model/best.pt"
+model = YOLO("senv/best3.0.pt")
 
 
 class camera(Node):
@@ -87,7 +86,7 @@ class camera(Node):
             self.line_timer_period, self.line_detection)
 
         self.status = ""
-        self.sign_timer_period = 0.5 # MAYBE CHANGE
+        self.sign_timer_period = 0.5  # MAYBE CHANGE
         self.sign_timer = self.create_timer(
             self.sign_timer_period, self.sign_handler)
 
@@ -306,7 +305,7 @@ class camera(Node):
         # directory = "/home/lennart/ros2_ws/src/senv/Images/park"
         # sign = "park"
         # template output
-        directory = "/home/lennart/ros2_ws/src"
+        directory = "/home/lennart/ros2_ws/src/senv/Images/human"
         sign = "human"
 
         # Get the current time
@@ -327,10 +326,10 @@ class camera(Node):
         print("After saving image:")
 
         print(f'Successfully saved {time_str}')
-        sek = 1
+        sek = 6
         elapsed_time = time.time() - self.start_time
         if elapsed_time > sek:
-            self.get_logger().info("32 Sekunden erreicht – Programm wird beendet.")
+            self.get_logger().info(f"{sek} Sekunden erreicht – Programm wird beendet.")
             rclpy.shutdown()
         return ""
 '''
@@ -353,7 +352,7 @@ class camera(Node):
             # IDs of the detected classes (e.g. 0, 1, 2 …)
             class_ids = results[0].boxes.cls.cpu().numpy().astype(int)
             # Bounding boxes: [x1, y1, x2, y2], neccesary for filtered sign display in the image
-            xyxy = results[0].boxes.xyxy.cpu().numpy()
+            # xyxy = results[0].boxes.xyxy.cpu().numpy()
 
             # folter for signs with a probability of at least 0.8
             high_conf_indices = [i for i, conf in enumerate(results[0].boxes.conf.cpu().numpy())
@@ -379,7 +378,6 @@ class camera(Node):
             cv2.imshow("YOLOv8-Erkennung (Confidence > 0.8)", image)
             cv2.waitKey(1)
             '''
-
             filtered_class_ids = [class_ids[i] for i in high_conf_indices]
             detected_labels = [class_names[i] for i in filtered_class_ids]
             # when there is no sign detected, the list is empty

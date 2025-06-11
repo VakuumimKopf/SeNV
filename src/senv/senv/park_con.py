@@ -186,7 +186,7 @@ class park_con(Node):
             self.park_spot = "right"
         else:
             self.park_spot = "none"
-            
+
             front_spot = "empty"
             left_spot = "empty"
             right_spot = "empty"

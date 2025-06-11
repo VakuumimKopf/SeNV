@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from ultralytics import YOLO
 
 # Modell laden
-model = YOLO(r"runs\detect\train3\model2.0\weights\best.pt")
+model = YOLO(r"src/senv/best3.0.pt")
 print(f" Anzahl Layer : {len(list(model.model.model))}")  # Anzahl Layer im Modell
 print(f" Anzahl Sub-Layer : {len(list(model.model.modules()))}")  # Anzahl Sub-Layer im Modell (Layer in Conv2d, BatchNorm, etc.)
 # Speicher für Feature Maps
@@ -28,7 +28,7 @@ for i in layers_to_hook:
     layer.register_forward_hook(save_hook)
 
 # Bild vorbereiten
-img_path = r"links.jpg"
+img_path = r"src/sign_recognition/left.jpg"
 img = cv2.imread(img_path)
 img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 img_resized = cv2.resize(img_rgb, (640, 640))
