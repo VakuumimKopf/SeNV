@@ -67,6 +67,11 @@ class crosswalk_con(Node):
 
         self.publisher_driver = self.create_publisher(Twist, 'driving', qos_profile=qos_policy)
 
+        self.x1 = 0
+        self.x2 = 0
+        self.y1 = 0
+        self.y2 = 0
+
     def execute_callback(self, goal_handle: ServerGoalHandle):
 
         # Get request from goal
@@ -120,7 +125,7 @@ class crosswalk_con(Node):
                 self.publisher_driver.publish(stopmsg)
                 human_still_there = self.detect_human()
                 # if the human hasnt been removed
-                if human_still_there:
+                if not human_still_there:
                     human_there = False
             # if there is no human
             else:
@@ -146,7 +151,8 @@ class crosswalk_con(Node):
             # IDs of the detected classes (e.g. 0, 1, 2 …)
             class_ids = results[0].boxes.cls.cpu().numpy().astype(int)
             # x and y coordinates of the bounding boxes, might be used later on for filtering small humans in signs
-            # xyxy = results[0].boxes.xyxy.cpu().numpy()
+            xyxy = results[0].boxes.xyxy.cpu().numpy()
+            self.x1, self.y1, self.x2, self.y2 = map(int, xyxy[0])
 
             # folter for signs with a probability of at least 0.8
             high_conf_indices = [i for i, conf in enumerate(results[0].boxes.conf.cpu().numpy())
