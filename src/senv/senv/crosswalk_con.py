@@ -16,7 +16,7 @@ import numpy as np
 
 # model for detecting human near crosswalk
 from ultralytics import YOLO
-model = YOLO("senv/human.pt")
+model = YOLO("src/senv/human.pt")
 
 
 class crosswalk_con(Node):
@@ -25,8 +25,10 @@ class crosswalk_con(Node):
         self.get_logger().info('crosswalk_con node has been started.')
 
         # Parameters
-        self.turned_on = False
-
+        self.count = 0
+        self.turned_on = True
+        self.person_detected = False
+        self.person_position = 0
         # QOS Policy Setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
@@ -72,6 +74,8 @@ class crosswalk_con(Node):
         self.y1 = 0
         self.y2 = 0
 
+        self.datahandler()
+
     def execute_callback(self, goal_handle: ServerGoalHandle):
 
         # Get request from goal
@@ -110,50 +114,66 @@ class crosswalk_con(Node):
         self.img = data
 
     def datahandler(self):
-        while True:
-            self.get_logger().info("Handling crosswalk data")
-            stopmsg = Twist()
-            stopmsg.angular.z = 0.0
-            stopmsg.angular.x = 0.0
-            self.get_logger().info("Suche nach Mensch")
+        self.get_logger().info("Handling crosswalk data")
 
-            # returns bool (if human -> True)
-            human_there = self.detect_human()
+        # Paramaters (Configuration needed)
+        crosswalk_left = 70  # approximate position of left end of Crosswalk
+        crosswalk_right = 475  # ' - ' right Crosswalk
+        # person_still_detected = False
+        stopmsg = Twist()
+        stopmsg.angular.z = 0.0
+        stopmsg.angular.x = 0.0
+        self.get_logger().info("Suche nach Mensch")
 
-            while human_there:
-                self.get_logger().info("Mensch wartet am Zebrastreifen")
-                self.publisher_driver.publish(stopmsg)
-                human_still_there = self.detect_human()
-                # if the human hasnt been removed
-                if not human_still_there:
-                    human_there = False
-            # if there is no human
+        # returns bool (if human -> True)
+        self.person_detected = self.detect_human()
+        if self.person_detected is True:
+            self.get_logger().info("Mensch Erkannt")
+            self.publisher_driver.publish(stopmsg)  # Stop when detecting Person
+            if self.person_position <= crosswalk_left:
+                self.get_logger().info("Person Left at Crosswalk")
+                while self.person_position <= crosswalk_right and self.person_detected:
+                    self.get_logger().info("Crossing Left -> Right")
+                    self.wait_ros2(1)  # update 1/sec while person is crossing
+                    self.person_detected = self.detect_human()
+                self.get_logger().info("Crossing Left -> Right done")
+            elif self.person_position >= crosswalk_right:
+                self.get_logger().info("Person Right at Crosswalk")
+                while self.person_position > crosswalk_left and self.person_detected:
+                    self.get_logger().info("Crossing Right -> Left")
+                    self.wait_ros2(1)  # update 1/sec while person is crossing
+                    self.person_detected = self.detect_human()
+                self.get_logger().info("Crossing Right -> Left done")
             else:
-                # driverlogic here
-                pass
+                self.panic()  # lil spin when person is detected in the road at start
+                self.get_logger().info("Person in the Road")
+        return
 
     # detect human
     def detect_human(self):
         """
-        Predict the class of an image using a pre-trained model. DO NOT USE cv2.imshow IN HERE OR IT WONT WORK
+        Predict the class of an image using a pre-trained model. 
+        DO NOT USE cv2.imshow IN HERE OR IT WONT WORK
         """
+        self.count += 1  # Count for testing purposes
+        self.get_logger().info(f"Detecting Human (Nr. {self.count} )")
+        
         if self.img != []:
             # threshhold/least confidence of detected signs
             threshhold = 0.8
             # get the image from the camera as np.array
             image = self.bridge.compressed_imgmsg_to_cv2(self.img, desired_encoding='passthrough')
             # Prediction (Inference)
-            results = model(image, verbose=False)  # kann auch save=True sein
-
+            results = model(image, verbose=False)
             # classlist from model (the names must match your `data.yaml`)
             class_names = model.names
 
             # IDs of the detected classes (e.g. 0, 1, 2 …)
             class_ids = results[0].boxes.cls.cpu().numpy().astype(int)
-            # x and y coordinates of the bounding boxes, might be used later on for filtering small humans in signs
+            # x and y coordinates of the bounding boxes, for position of human while crossing
             xyxy = results[0].boxes.xyxy.cpu().numpy()
             self.x1, self.y1, self.x2, self.y2 = map(int, xyxy[0])
-
+            self.person_position = self.x1 + (self.x2 - self.x1) / 2
             # folter for signs with a probability of at least 0.8
             high_conf_indices = [i for i, conf in enumerate(results[0].boxes.conf.cpu().numpy())
                                  if conf > threshhold]
@@ -172,6 +192,25 @@ class crosswalk_con(Node):
 
         else:
             return ""
+
+    def panic(self):
+        msg = Twist()
+        msg.linear.x = 0.0
+        msg.angular.z = 1.0
+        self.publisher_driver.publish(msg)
+        duration = 6
+
+        # ROS 2-kompatibles Warten
+        self.wait_ros2(duration)
+
+        msg.angular.z = 0.0
+        self.publisher_driver.publish(msg)
+
+    def wait_ros2(self, duration):
+        """ROS 2-kompatibles Warten, ohne Callbacks zu blockieren."""
+        start_time = self.get_clock().now().nanoseconds
+        while (self.get_clock().now().nanoseconds - start_time) / 1e9 < duration:
+            rclpy.spin_once(self, timeout_sec=0.1)
 
 
 def main(args=None):
