@@ -99,21 +99,11 @@ class camera(Node):
     # starts sign and light detection and publishes result
     def sign_handler(self):
 
-        light_status = self.light_detection()
-        sign_status = self.sign_identification()
-
-        # If light and sign are detected prefer sign
-        if (sign_status != ""):
-            status = sign_status
-
-        elif (light_status != ""):
-            status = light_status
-
-        else:
-            status = ""
-
         msg = Pic()
-        msg.status = status
+
+        msg.light = self.light_detection()
+        msg.sign = self.sign_identification()
+
         self.publisher_.publish(msg)
 
     def light_detection(self):
