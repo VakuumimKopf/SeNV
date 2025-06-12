@@ -1,13 +1,12 @@
 
 import rclpy
-import time
-import threading
 from rclpy.node import Node
 from rclpy.action import ActionClient
 from rclpy.action.client import ClientGoalHandle
 from senv_interfaces.msg import Pic, Laser
 from senv_interfaces.action import ConTask
 from std_msgs.msg import String
+import threading
 
 
 class state_machine(Node):
@@ -114,8 +113,8 @@ class state_machine(Node):
         self.goal_handle_: ClientGoalHandle = future.result()
         if self.goal_handle_.accepted:  # if accepted call goal_result_callback
             self.goal_handle_.get_result_async().add_done_callback(self.goal_result_callback)
-        #  timer = threading.Timer(10.0, self.stop)
-        #  timer.start()
+        timer = threading.Timer(10.0, self.stop)
+        timer.start()
 
     # Feedback from action server
     def feedback_callback(self, feedback):
@@ -221,7 +220,7 @@ class state_machine(Node):
     
     def test(self):
         msg1 = Pic()
-        msg1.sign = "left"
+        msg1.sign = ""
         msg1.light = ""
         self.last_pic_msg = msg1
         msg2 = Laser()

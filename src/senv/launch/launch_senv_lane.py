@@ -14,7 +14,7 @@ def generate_launch_description():
         ),
         Node(
             package='senv',
-            executable='intersection_con',
+            executable='lane_con',
             # activate output
             output='screen',
             emulate_tty=True,
