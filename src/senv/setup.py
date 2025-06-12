@@ -32,6 +32,7 @@ setup(
             'laserscanner = senv.laserscanner:main',
             'obstacle_con = senv.obstacle_con:main',
             'lane_detect=senv.lane_detect:main',
+            'state_machine=senv.state_machine:main',
         ],
     },
 )

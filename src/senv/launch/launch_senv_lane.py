@@ -6,7 +6,7 @@ def generate_launch_description():
     return LaunchDescription([
         Node(
             package='senv',
-            executable='driver',
+            executable='state_machine',
             # activate output
             output='screen',
             emulate_tty=True,
@@ -14,7 +14,7 @@ def generate_launch_description():
         ),
         Node(
             package='senv',
-            executable='lane_detect',
+            executable='intersection_con',
             # activate output
             output='screen',
             emulate_tty=True,

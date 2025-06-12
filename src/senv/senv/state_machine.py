@@ -1,6 +1,7 @@
 
 import rclpy
 import time
+import threading
 from rclpy.node import Node
 from rclpy.action import ActionClient
 from rclpy.action.client import ClientGoalHandle
@@ -15,7 +16,7 @@ class state_machine(Node):
         self.get_logger().info('state_machine node has been started.')
 
         self.state = ""
-        self.debug_mode = False
+        self.debug_mode = True
         self.seen_red_once = False
 
         # Last incoming data
@@ -31,7 +32,7 @@ class state_machine(Node):
 
         # Subscribing to camera and laser topics
         self.subscriber_pic = self.create_subscription(
-            Pic,  # Replace with the actual message type
+            Pic,
             'pic',
             self.pic_callback,
             qos_profile=qos_policy
@@ -39,7 +40,7 @@ class state_machine(Node):
         self.subscriber_pic  # prevent unused variable warning
 
         self.subscriber_laser = self.create_subscription(
-            Laser,  # Replace with the actual message type
+            Laser,
             'laser',
             self.laser_callback,
             qos_profile=qos_policy
@@ -79,6 +80,7 @@ class state_machine(Node):
         self.line_timer = self.create_timer(
             self.line_timer_period, self.status_evaluation)
 
+        # dictionary for state to client mapping
         self.client_dict = {
             "obstacle": self.obstacle_client,
             "lane": self.lane_client,
@@ -91,17 +93,15 @@ class state_machine(Node):
     # Sending request to action server
     def send_goal(self, working_status, info, client: ActionClient):
 
-        # self.intersection_client_.wait_for_server()
         client.wait_for_server()
 
-        # goal = ConTask.Goal()
         goal = client._action_type.Goal()
 
         goal.start_working = working_status
         goal.info = info
 
         if self.debug_mode is True:
-            self.get_logger().info("sending data to intersection server")
+            self.get_logger().info("Sending data to server")
 
         self._send_goal_future = client.send_goal_async(
             goal,
@@ -114,6 +114,8 @@ class state_machine(Node):
         self.goal_handle_: ClientGoalHandle = future.result()
         if self.goal_handle_.accepted:  # if accepted call goal_result_callback
             self.goal_handle_.get_result_async().add_done_callback(self.goal_result_callback)
+        #  timer = threading.Timer(10.0, self.stop)
+        #  timer.start()
 
     # Feedback from action server
     def feedback_callback(self, feedback):
@@ -127,7 +129,7 @@ class state_machine(Node):
 
     #  Waiting for confimation to shut down
     def cancel_done(self, future):
-        cancel_response = future.result().result
+        cancel_response = future.result()
         if len(cancel_response.goals_canceling) > 0:
             self.get_logger().info('Goal successfully canceled')
         else:
@@ -136,9 +138,6 @@ class state_machine(Node):
     # Requesting Result from action server
     def goal_result_callback(self, future):
         result = future.result().result
-
-        if result.finished is True:
-            self.finish_move()
 
         self.get_logger().info("Result:" + str(result.finished))
         self.is_turned_on = True
@@ -205,10 +204,6 @@ class state_machine(Node):
         if new_state != old_state:
             self.update_node_state(new_state, info)
 
-    def finish_move(self):
-        self.driving_sender("drive_normal", 0.115, 0.0)
-        time.sleep(1)
-
     # Update node state if changed
     def update_node_state(self, state, info):
 
@@ -223,18 +218,31 @@ class state_machine(Node):
         out = String()
         out.data = "Changed to " + str(state)
         self.publisher_state.publish(out)
+    
+    def test(self):
+        msg1 = Pic()
+        msg1.sign = "left"
+        msg1.light = ""
+        self.last_pic_msg = msg1
+        msg2 = Laser()
+        msg2.front_distance = 0.0
+        self.last_laser_msg = msg2
+
+    def stop(self):
+        self.shutdown_action()
 
 
 def main(args=None):
     rclpy.init(args=args)
     node = state_machine()
 
+    node.test()
+
     try:
         rclpy.spin(node)
 
     except KeyboardInterrupt:
         node.destroy_node()
-
     finally:
         node.destroy_node()
         print('Shutting Down state_machine')

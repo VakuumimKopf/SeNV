@@ -1,36 +1,14 @@
 import rclpy
 from rclpy.node import Node
-from rclpy.action import ActionServer
+from rclpy.action import ActionServer, CancelResponse
 from rclpy.action.server import ServerGoalHandle
-from senv_interfaces.msg import Pic, Laser
+from senv_interfaces.msg import Pic, Laser, Move
 from senv_interfaces.action import ConTask
-from std_msgs.msg import String
-from senv.stopper import Stopper
-import time
-from rcl_interfaces.msg import ParameterDescriptor, ParameterType, IntegerRange, FloatingPointRange
+from rclpy.executors import MultiThreadedExecutor
+from rclpy.callback_groups import ReentrantCallbackGroup
 
-def light_int_desc(desc):
-    min_val=0 
-    max_val=255 
-    step=1
-    return ParameterDescriptor(type= ParameterType.PARAMETER_INTEGER, description=desc, 
-                                integer_range=[IntegerRange(from_value=min_val, to_value=max_val, step=step)])
-def int_desc(desc):
-    min_val=0
-    max_val=1000
-    step=1
-    return ParameterDescriptor(type= ParameterType.PARAMETER_INTEGER, description=desc, 
-                                integer_range=[IntegerRange(from_value=min_val, to_value=max_val, step=step)])
-def float_desc(desc):
-    min_val=0.0
-    max_val=2.0
-    step=0.001
-    return ParameterDescriptor(type= ParameterType.PARAMETER_DOUBLE, description=desc, 
-                                floating_point_range=[FloatingPointRange(from_value=min_val, to_value=max_val, step=step)])
-def bool_desc(desc):
-    return ParameterDescriptor(type=ParameterType.PARAMETER_BOOL, description = desc)
 
-class intersection_con(Node):
+class Intersection_con(Node):
     def __init__(self):
         super().__init__('intersection_con')
         self.get_logger().info('intersection_con node has been started.')
@@ -44,7 +22,7 @@ class intersection_con(Node):
 
         # Subscribing to camera and laser topics
         self.subscriber_pic = self.create_subscription(
-            Pic,  # Replace with the actual message type
+            Pic,
             'pic',
             self.pic_callback,
             qos_profile=qos_policy
@@ -52,7 +30,7 @@ class intersection_con(Node):
         self.subscriber_pic  # prevent unused variable warning
 
         self.subscriber_laser = self.create_subscription(
-            Laser,  # Replace with the actual message type
+            Laser,
             'laser',
             self.laser_callback,
             qos_profile=qos_policy
@@ -63,19 +41,26 @@ class intersection_con(Node):
             self,
             ConTask,
             "intersection_task",
-            self.execute_callback
+            execute_callback=self.execute_callback,
+            cancel_callback=self.cancel_callback,
+            callback_group=ReentrantCallbackGroup(),
         )
+
+        self.publisher_driver = self.create_publisher(Move, "drive", qos_policy)
 
     def execute_callback(self, goal_handle: ServerGoalHandle):
 
         # Get request from goal
         target = goal_handle.request.start_working
+        info = goal_handle.request.info
         self.get_logger().info("starting intersection server")
 
-        # Execute action
+        # Turn in action server
         self.turned_on = target
-        self.datahandler()
-        self.get_logger().info("Handling intersection complete")
+
+        # Execute code as long as node is turned on
+        while self.turned_on is True:
+            self.datahandler(info)
 
         # Final Goal State
         goal_handle.succeed()
@@ -85,41 +70,34 @@ class intersection_con(Node):
         result.finished = True
         return result
 
+    def cancel_callback(self, goal_handle):
+        self.turned_on = False
+        return CancelResponse.ACCEPT
+
     def pic_callback(self, msg):
         if self.turned_on is False:
             return
-        # Process the incoming message
-        self.get_logger().info('Received message pic')
-        # Add driving logic here
 
     def laser_callback(self, msg):
         if self.turned_on is False:
             return
-        # Define your callback function here
-        self.get_logger().info('Received message laser')
-        # obstacle avoidance
 
-    def datahandler(self):
+    def datahandler(self, info):
         self.get_logger().info("Handling intersection data")
-        time.sleep(100)
+        self.get_logger().info(str(info))
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = intersection_con()
-
+    intersection_con = Intersection_con()
+    executor = MultiThreadedExecutor()
     try:
-        rclpy.spin(node)
-
+        rclpy.spin(intersection_con, executor=executor)
     except KeyboardInterrupt:
-        node.destroy_node()
-
+        intersection_con.destroy_node()
     finally:
-        #stop = Stopper()
-        node.destroy_node()
-        #stop.destroy_node()
-        #rclpy.shutdown()
-        print('Shutting Down Intersection_Con')
+        intersection_con.destroy_node()
+        print('Shutting Down intersection_con')
 
 
 if __name__ == '__main__':
