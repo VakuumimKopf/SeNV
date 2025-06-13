@@ -33,6 +33,7 @@ setup(
             'obstacle_con = senv.obstacle_con:main',
             'lane_detect=senv.lane_detect:main',
             'state_machine=senv.state_machine:main',
+            'crosswalk_con=senv.crosswalk_con:main',
         ],
     },
 )

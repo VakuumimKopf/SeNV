@@ -94,9 +94,9 @@ class laserscanner(rclpy.node.Node):
         msg.front_distance = self.front_distance
         msg.front_left_distance = self.front_left_distance
         msg.left_distance = self.left_distance
-        msg.left_back_distance = self.back_left_distance
+        msg.back_left_distance = self.back_left_distance
         msg.back_distance = self.back_distance
-        msg.right_back_distance = self.back_right_distance
+        msg._back_right_distance = self.back_right_distance
         msg.right_distance = self.right_distance
         msg.front_right_distance = self.front_right_distance
         self.publisher_laserturn.publish(msg)

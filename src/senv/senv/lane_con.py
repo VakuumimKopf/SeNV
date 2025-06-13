@@ -46,7 +46,7 @@ class Lane_con(Node):
             callback_group=ReentrantCallbackGroup(),
         )
 
-        self.publisher_driver = self.create_publisher(Move, "drive", qos_policy)
+        self.publisher_driver = self.create_publisher(Move, "drive", 1)
 
     def execute_callback(self, goal_handle: ServerGoalHandle):
 
@@ -83,7 +83,11 @@ class Lane_con(Node):
             return
 
     def datahandler(self, info):
-        self.get_logger().info("Handling lane data")
+        msg = Move()
+        msg.follow = True
+        msg.speed = 1
+        msg.turn = 0
+        self.publisher_driver.publish(msg)
 
 
 def main(args=None):

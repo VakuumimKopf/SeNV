@@ -36,13 +36,13 @@ class Driver(Node):
             self.lane_callback,
             qos_profile=qos_policy
         )
-        self.subscriber  # prevent unused variable warning
+        self.lane_subscriber  # prevent unused variable warning
 
         # Stop-Flag
         self.stop_requested = False
 
         #  Publisher
-        self.publisher = self.create_publisher(Twist, 'cmd_vel', 1)
+        self.publisher_driver = self.create_publisher(Twist, 'cmd_vel', 1)
 
         # Signal-Handler korrekt registrieren
         signal.signal(signal.SIGINT, self.handle_shutdown_signal)
@@ -78,9 +78,9 @@ class Driver(Node):
             area_short = 15
             area_long = 35
 
-            lines = [last_lane_msg.gline.a, last_lane_msg.gline.b, last_lane_msg.gline.c]
+            lines = [last_lane_msg.gline_a, last_lane_msg.gline_b, last_lane_msg.gline_c]
 
-            if lines is None or lines[0] is None:
+            if all(v == 0 for v in lines[0]):
                 return
 
             #  Calculate middle of the line
@@ -103,13 +103,23 @@ class Driver(Node):
                 turn = 0.0
 
             speed = 0.2*(1-abs(turn))
+        else:
+            if last_drive_msg.turn == 1:
+                speed = 0.0
+                turn = 0.1
+
+        msg = Twist()
+        msg.angular.z = turn * self.last_drive_msg.speed
+        msg.linear.x = speed * self.last_drive_msg.speed
+
+        self.publisher_driver.publish(msg)
 
     def publish_stop(self):
         if rclpy.ok():
             msg = Twist()
             msg.linear.x = 0.0
             msg.angular.z = 0.0
-            self.publisher.publish(msg)
+            self.publisher_driver.publish(msg)
             self.get_logger().info('Stop-Befehl gesendet')
         else:
             self.get_logger().warn('Konnte Stop nicht senden – rclpy nicht mehr OK')

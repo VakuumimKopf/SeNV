@@ -6,7 +6,9 @@ from rclpy.action.client import ClientGoalHandle
 from senv_interfaces.msg import Pic, Laser
 from senv_interfaces.action import ConTask
 from std_msgs.msg import String
-import threading
+from rclpy.executors import MultiThreadedExecutor
+from rclpy.callback_groups import ReentrantCallbackGroup
+
 
 
 class state_machine(Node):
@@ -17,6 +19,9 @@ class state_machine(Node):
         self.state = ""
         self.debug_mode = True
         self.seen_red_once = False
+        self.goal_handle_ = None
+        self.cancel_await = True
+        self.is_turned_on = True
 
         # Last incoming data
         self.last_pic_msg = None
@@ -50,25 +55,36 @@ class state_machine(Node):
         self.intersection_client = ActionClient(
             self,
             ConTask,
-            "intersection_task"
+            "intersection_task",
+            callback_group=ReentrantCallbackGroup(),
         )
 
         self.park_client = ActionClient(
             self,
             ConTask,
-            "park_task"
+            "park_task",
+            callback_group=ReentrantCallbackGroup(),
         )
 
         self.obstacle_client = ActionClient(
             self,
             ConTask,
-            "obstacle_task"
+            "obstacle_task",
+            callback_group=ReentrantCallbackGroup(),
         )
 
         self.lane_client = ActionClient(
             self,
             ConTask,
-            "lane_task"
+            "lane_task",
+            callback_group=ReentrantCallbackGroup(),
+        )
+
+        self.crosswalk_client = ActionClient(
+            self,
+            ConTask,
+            "crosswalk_task",
+            callback_group=ReentrantCallbackGroup(),
         )
 
         # Topics to publish to
@@ -84,7 +100,8 @@ class state_machine(Node):
             "obstacle": self.obstacle_client,
             "lane": self.lane_client,
             "park": self.park_client,
-            "intersection": self.intersection_client
+            "intersection": self.intersection_client,
+            "crosswalk": self.crosswalk_client,
         }
 
     # region action client
@@ -108,13 +125,15 @@ class state_machine(Node):
 
         self._send_goal_future.add_done_callback(self.goal_response_callback)
 
+        self.cancel_await = None
+
     # Awaiting response from action server if request accepted
     def goal_response_callback(self, future):
         self.goal_handle_: ClientGoalHandle = future.result()
         if self.goal_handle_.accepted:  # if accepted call goal_result_callback
             self.goal_handle_.get_result_async().add_done_callback(self.goal_result_callback)
-        timer = threading.Timer(10.0, self.stop)
-        timer.start()
+        #timer = threading.Timer(10.0, self.stop)
+        #timer.start()
 
     # Feedback from action server
     def feedback_callback(self, feedback):
@@ -131,8 +150,10 @@ class state_machine(Node):
         cancel_response = future.result()
         if len(cancel_response.goals_canceling) > 0:
             self.get_logger().info('Goal successfully canceled')
+            self.cancel_await = True
         else:
             self.get_logger().info('Goal failed to cancel')
+            self.cancel_await = False
 
     # Requesting Result from action server
     def goal_result_callback(self, future):
@@ -140,6 +161,7 @@ class state_machine(Node):
 
         self.get_logger().info("Result:" + str(result.finished))
         self.is_turned_on = True
+        self.cancel_await = None
 
     # endregion
 
@@ -156,6 +178,9 @@ class state_machine(Node):
 
         # Ensure laser and pic message is available
         if self.last_laser_msg is None or self.last_pic_msg is None:
+            return
+
+        if self.is_turned_on is False:
             return
 
         # Get most recent msg objects
@@ -186,6 +211,11 @@ class state_machine(Node):
             new_state = "intersection"
             info = last_pic_msg.sign
 
+        elif last_pic_msg.sign == "crosswalk":
+
+            new_state = "crosswalk"
+            info = ""
+
         elif last_pic_msg.sign == "red light" and self.seen_red_once is False:
 
             new_state = "wait_for_green"
@@ -206,9 +236,25 @@ class state_machine(Node):
     # Update node state if changed
     def update_node_state(self, state, info):
 
+        self.get_logger().info(str(self.cancel_await))
+
+        if self.goal_handle_ is not None:
+            self.shutdown_action()
+
         if self.debug_mode is True:
             self.get_logger().info("Übergeben an: " + state)
 
+        self.get_logger().info("Wait for cancel response")
+
+        while self.cancel_await is None:
+            pass
+
+        if self.cancel_await is False:
+            self.is_turned_on = False
+            self.get_logger().info("Cancel denied")
+            return
+
+        self.get_logger().info("Cancel accepted")
         #  Start Action with paired action server
         self.send_goal(True, info, self.client_dict[state])
 
@@ -217,28 +263,15 @@ class state_machine(Node):
         out = String()
         out.data = "Changed to " + str(state)
         self.publisher_state.publish(out)
-    
-    def test(self):
-        msg1 = Pic()
-        msg1.sign = ""
-        msg1.light = ""
-        self.last_pic_msg = msg1
-        msg2 = Laser()
-        msg2.front_distance = 0.0
-        self.last_laser_msg = msg2
-
-    def stop(self):
-        self.shutdown_action()
 
 
 def main(args=None):
     rclpy.init(args=args)
     node = state_machine()
-
-    node.test()
+    executor = MultiThreadedExecutor()
 
     try:
-        rclpy.spin(node)
+        rclpy.spin(node, executor=executor)
 
     except KeyboardInterrupt:
         node.destroy_node()

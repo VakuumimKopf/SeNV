@@ -12,7 +12,7 @@ from senv_interfaces.msg import Lane
 class lane_detect(Node):
     def __init__(self):
         super().__init__('lane_detect')
-
+        self.get_logger().info("Lane_detect node gestarte")
         #  Parameters
         self.debug_mode = False
 
@@ -132,11 +132,14 @@ class lane_detect(Node):
             cv2.waitKey(1)
 
         msg = Lane()
-        msg.gline_a = self.guiding_lines[0]
-        msg.gline_b = self.guiding_lines[1]
-        msg.gline_c = self.guiding_lines[2]
+        if self.guiding_lines[0] is not None:
+            msg.gline_a = self.guiding_lines[0]
+        if self.guiding_lines[1] is not None:
+            msg.gline_b = self.guiding_lines[1]
+        if self.guiding_lines[2] is not None:
+            msg.gline_c = self.guiding_lines[2]
 
-        self.publisher_.publish
+        self.publisher_.publish(msg)
 
     #  Filtering a set of lines based on lane widthe
     def filtering(self, lines: np.ndarray, last_lane_lines, num):

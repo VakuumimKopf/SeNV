@@ -11,7 +11,7 @@ from senv.description import light_int_desc
 from ultralytics import YOLO
 
 # load model
-model = YOLO("./yolo_model/best.pt")
+model = YOLO("/home/oliver/senv_ws/src/senv/senv/best3.0.pt")
 
 
 class camera(Node):
@@ -43,7 +43,7 @@ class camera(Node):
         self.declare_parameter('upgreen_alpha', 255, light_int_desc("Grün Helligkeit Obere Grenze"))
 
         # Variables
-        self.raw_image
+        self.raw_image = None
         self.bridge = CvBridge()
         self.hsv = np.array([])
         self.waitingforgreen = False
@@ -101,8 +101,10 @@ class camera(Node):
 
         msg = Pic()
 
-        msg.light = self.light_detection()
+        #msg.light = self.light_detection()
+        msg.light = ""
         msg.sign = self.sign_identification()
+        self.get_logger().info(str(msg.sign))
 
         self.publisher_.publish(msg)
 
@@ -252,38 +254,49 @@ class camera(Node):
     # Predict the class of an image using a pre-trained model
     def sign_identification(self):
 
+        if self.raw_image is None:
+            return ""
+
         image = self.raw_image
-
-        # Prediction (Inference)
+        threshhold = 0.8
         results = model(image, verbose=False)  # kann auch save=True sein
-
-        # classlist from model (the names must match your `data.yaml`)
         class_names = model.names
 
         # IDs of the detected classes (e.g. 0, 1, 2 …)
         class_ids = results[0].boxes.cls.cpu().numpy().astype(int)
+        # Bounding boxes: [x1, y1, x2, y2], neccesary for filtered sign display in the image
+        xyxy = results[0].boxes.xyxy.cpu().numpy()
 
-        # Change labels to names
-        detected_labels = [class_names[i] for i in class_ids]
+        # folter for signs with a probability of at least 0.8
+        high_conf_indices = [i for i, conf in enumerate(results[0].boxes.conf.cpu().numpy())
+                             if conf > threshhold]
 
+        # if there is no sign with at least 80% recognition
+        if not high_conf_indices:
+            return ""
+        # Display signs with over 80% in another image
+        
+        # manual display of filtered signs
+        for i in high_conf_indices:
+            x1, y1, x2, y2 = map(int, xyxy[i])
+            label = f"{class_names[class_ids[i]]}: {results[0].boxes.conf.cpu().numpy()[i]:.2f}"
+
+            # Zeichne Rechteck
+            cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 0), 2)
+            # Zeichne Label
+            cv2.putText(image, label, (x1, y1 - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+
+        # Zeige das bearbeitete Bild mit nur den gefilterten Erkennungen
+        cv2.imshow("YOLOv8-Erkennung (Confidence > 0.8)", image)
+        cv2.waitKey(1)
+        
+        filtered_class_ids = [class_ids[i] for i in high_conf_indices]
+        detected_labels = [class_names[i] for i in filtered_class_ids]
         # when there is no sign detected, the list is empty
         if detected_labels == []:
-            # self.get_logger().info("No sign detected")
             return ""
-
-        """
-        # DEBUG printet alle erkannten Schilder und zeigt Rahmen um diese
-
-        print("Erkannte Schilder:", detected_labels)
-        # Annotiertes Bild aus dem Ergebnis holen
-        annotated_image = results[0].plot()  # Gibt ein NumPy-Array zurück
-
-        # Bild anzeigen mit OpenCV
-        cv2.imshow("YOLOv8-Erkennung", annotated_image)
-        cv2.waitKey(1)
-        """
-
-        # return first detected label
+        # self.get_logger().info(f"Detected Sign is {detected_labels}")
         return detected_labels[0]
 
 
