@@ -148,7 +148,7 @@ class lane_con(Node):
         # Check if node has controll
         if self.is_turned_on is False:
             return
-        if self.wait_at_start < 100:
+        while self.wait_at_start < 100:
             self.get_logger().info("Waiting for start signal")
             self.wait_at_start += 1
             return

@@ -16,7 +16,6 @@ import numpy as np
 
 # model for detecting human near crosswalk
 from ultralytics import YOLO
-model = YOLO("src/senv/human.pt")
 
 
 class crosswalk_con(Node):
@@ -25,10 +24,12 @@ class crosswalk_con(Node):
         self.get_logger().info('crosswalk_con node has been started.')
 
         # Parameters
+        self.model = YOLO("senv/human.pt")
         self.count = 0
-        self.turned_on = True
+        self.turned_on = False
         self.person_detected = False
         self.person_position = 0
+        self.last_pic_msg = None
         # QOS Policy Setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
@@ -71,10 +72,6 @@ class crosswalk_con(Node):
 
         self.x1 = 0
         self.x2 = 0
-        self.y1 = 0
-        self.y2 = 0
-
-        self.datahandler()
 
     def execute_callback(self, goal_handle: ServerGoalHandle):
 
@@ -98,6 +95,7 @@ class crosswalk_con(Node):
     def pic_callback(self, msg):
         if self.turned_on is False:
             return
+        self.last_pic_msg = msg
         # Process the incoming message
         self.get_logger().info('Received message pic')
         # Add driving logic here
@@ -114,59 +112,66 @@ class crosswalk_con(Node):
         self.img = data
 
     def datahandler(self):
+        if self.last_pic_msg is None:
+            return
         self.get_logger().info("Handling crosswalk data")
-
-        # Paramaters (Configuration needed)
-        crosswalk_left = 70  # approximate position of left end of Crosswalk
-        crosswalk_right = 475  # ' - ' right Crosswalk
-        # person_still_detected = False
         stopmsg = Twist()
         stopmsg.angular.z = 0.0
         stopmsg.angular.x = 0.0
-        self.get_logger().info("Suche nach Mensch")
+        # person_still_detected = False
+        sign = self.last_pic_msg.sign
+        while sign == "crosswalk":
+            self.get_logger().info("Crosswalk Sign Still Detected")
+            self.get_logger().info(f"Sign is {self.last_pic_msg.sign}")
+            sign = self.last_pic_msg.sign
+            # HIER lane following einbauen
+            # drive until crosswalk sign is not detected anymore
 
-        # returns bool (if human -> True)
+        # HIER eventuell stop befehl einbauen
+
+        # start checking for human
+        self.get_logger().info("Suche nach Mensch")
+        # returns bool for detection of human (human there -> True)
         self.person_detected = self.detect_human()
-        if self.person_detected is True:
-            self.get_logger().info("Mensch Erkannt")
-            self.publisher_driver.publish(stopmsg)  # Stop when detecting Person
-            if self.person_position <= crosswalk_left:
-                self.get_logger().info("Person Left at Crosswalk")
-                while self.person_position <= crosswalk_right and self.person_detected:
-                    self.get_logger().info("Crossing Left -> Right")
-                    self.wait_ros2(1)  # update 1/sec while person is crossing
-                    self.person_detected = self.detect_human()
-                self.get_logger().info("Crossing Left -> Right done")
-            elif self.person_position >= crosswalk_right:
-                self.get_logger().info("Person Right at Crosswalk")
-                while self.person_position > crosswalk_left and self.person_detected:
-                    self.get_logger().info("Crossing Right -> Left")
-                    self.wait_ros2(1)  # update 1/sec while person is crossing
-                    self.person_detected = self.detect_human()
-                self.get_logger().info("Crossing Right -> Left done")
-            else:
-                self.panic()  # lil spin when person is detected in the road at start
-                self.get_logger().info("Person in the Road")
-        return
+
+        if self.person_detected is False:
+            self.get_logger().info("No Human Detected")
+            # HIER an lane_con übergeben
+        else:
+            self.get_logger().info("Human Detected")
+            # stop msg for better detection
+            self.publisher_driver.publish(stopmsg)
+            # get starting position of human
+            x_start = self.x1
+            # check for his position while crossing
+            while self.detect_human():
+                # pixel-width way of human, until we can drive
+                threshhold = 320 + 
+                # Difference between the starting position and the current position of the human
+                x_diff = abs(x_start - self.x1)
+                if x_diff < threshhold:
+                    self.get_logger().info("Human crossed the crosswalk")
+                    # HIER an lane_con übergeben
+                    return
 
     # detect human
     def detect_human(self):
         """
-        Predict the class of an image using a pre-trained model. 
+        Predict the class of an image using a pre-trained model.
         DO NOT USE cv2.imshow IN HERE OR IT WONT WORK
         """
         self.count += 1  # Count for testing purposes
         self.get_logger().info(f"Detecting Human (Nr. {self.count} )")
-        
+
         if self.img != []:
             # threshhold/least confidence of detected signs
             threshhold = 0.8
             # get the image from the camera as np.array
             image = self.bridge.compressed_imgmsg_to_cv2(self.img, desired_encoding='passthrough')
             # Prediction (Inference)
-            results = model(image, verbose=False)
+            results = self.model(image, verbose=False)
             # classlist from model (the names must match your `data.yaml`)
-            class_names = model.names
+            class_names = self.model.names
 
             # IDs of the detected classes (e.g. 0, 1, 2 …)
             class_ids = results[0].boxes.cls.cpu().numpy().astype(int)
@@ -194,6 +199,7 @@ class crosswalk_con(Node):
             return ""
 
     def panic(self):
+        self.get_logger().info("Panic Mode Activated")
         msg = Twist()
         msg.linear.x = 0.0
         msg.angular.z = 1.0

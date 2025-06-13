@@ -13,7 +13,7 @@ from senv.description import float_desc, int_desc, bool_desc, light_int_desc
 from ultralytics import YOLO
 # pip install yolov8
 # load model
-model = YOLO("senv/best3.0.pt")
+model = YOLO(r"senv/best3.0.pt")
 
 
 class camera(Node):
