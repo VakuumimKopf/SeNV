@@ -5,49 +5,121 @@ import signal
 import sys
 import threading
 import time
+from senv_interfaces.msg import Move, Lane
 
 
 class Driver(Node):
     def __init__(self):
         super().__init__('driver')
-        self.publisher = self.create_publisher(Twist, 'cmd_vel', 1)
+
         self.get_logger().info("Driver gestartet")
         self.get_logger().info('Driver was initialized')
+
+        self.last_drive_msg = None
+        self.last_lane_msg = None
+
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
 
         # Topic subscription
-        self.subscriber = self.create_subscription(
-            Twist,
-            'driving',
+        self.drive_subscriber = self.create_subscription(
+            Move,
+            'drive',
             self.driving_callback,
             qos_profile=qos_policy
         )
-        self.subscriber  # prevent unused variable warning
+        self.drive_subscriber  # prevent unused variable warning
+
+        self.lane_subscriber = self.create_subscription(
+            Lane,
+            'lane',
+            self.lane_callback,
+            qos_profile=qos_policy
+        )
+        self.lane_subscriber  # prevent unused variable warning
+
         # Stop-Flag
         self.stop_requested = False
+
+        #  Publisher
+        self.publisher_driver = self.create_publisher(Twist, 'cmd_vel', 1)
 
         # Signal-Handler korrekt registrieren
         signal.signal(signal.SIGINT, self.handle_shutdown_signal)
         signal.signal(signal.SIGTERM, self.handle_shutdown_signal)
 
-    def driving_callback(self, msg: Twist):
-        # Process the incoming message
-        self.get_logger().info(
-            "Driver recieved data: " + str(msg.linear.x) + " : " + str(msg.angular.z)
-            )
+        # create timers for data handling
+        self.build_drive_timer_period = 0.1
+        self.build_drive_timer = self.create_timer(
+            self.build_drive_timer_period, self.build_drive_msg)
 
-        # Debuga algorithm here
+    def driving_callback(self, msg):
 
-        # Send final msg here
-        self.publisher.publish(msg)
+        self.last_drive_msg = msg
+
+    def lane_callback(self, msg):
+
+        self.last_lane_msg = msg
+
+    def build_drive_msg(self):
+
+        if self.last_drive_msg is None or self.last_lane_msg is None:
+            return
+
+        last_drive_msg = self.last_drive_msg
+        last_lane_msg = self.last_lane_msg
+
+        speed = 0.0
+        turn = 0.0
+
+        if last_drive_msg.follow is True:
+
+            middle = 320
+            area_short = 15
+            area_long = 35
+
+            lines = [last_lane_msg.gline_a, last_lane_msg.gline_b, last_lane_msg.gline_c]
+
+            if all(v == 0 for v in lines[0]):
+                return
+
+            #  Calculate middle of the line
+            x1 = lines[0][0]
+            x2 = lines[0][2]
+            x_d = (x1 + x2) / 2
+
+            #  Determine Turn Value
+            if x_d < middle - area_short:
+                if x_d < middle - area_long:
+                    turn = 0.35
+                else:
+                    turn = 0.3
+            elif x_d > middle + area_short:
+                if x_d > middle + area_long:
+                    turn = -0.35
+                else:
+                    turn = -0.3
+            else:
+                turn = 0.0
+
+            speed = 0.2*(1-abs(turn))
+        else:
+            if last_drive_msg.turn == 1:
+                speed = 0.0
+                turn = 0.1
+
+        msg = Twist()
+        msg.angular.z = turn * self.last_drive_msg.speed
+        msg.linear.x = speed * self.last_drive_msg.speed
+
+        self.publisher_driver.publish(msg)
 
     def publish_stop(self):
         if rclpy.ok():
             msg = Twist()
             msg.linear.x = 0.0
             msg.angular.z = 0.0
-            self.publisher.publish(msg)
+            self.publisher_driver.publish(msg)
             self.get_logger().info('Stop-Befehl gesendet')
         else:
             self.get_logger().warn('Konnte Stop nicht senden – rclpy nicht mehr OK')
