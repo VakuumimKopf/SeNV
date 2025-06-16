@@ -5,13 +5,13 @@ from cv_bridge import CvBridge
 import cv2 as cv2
 import numpy as np
 from senv_interfaces.msg import Pic
-from senv.description import light_int_desc
+from senv.description import light_int_desc, int_desc
 
 # Import ultralytics for sign detection with "pip install ultralytics"
 from ultralytics import YOLO
 
 # load model
-model = YOLO("/home/lennart/ros2_ws/src/senv/senv/best3.0.pt")
+model = YOLO("src/senv/senv/best3.0.pt")
 
 
 class camera(Node):
@@ -41,12 +41,15 @@ class camera(Node):
         self.declare_parameter('upgreen_color', 85, light_int_desc("Grün Farbwert Obere Grenze"))
         self.declare_parameter('upgreen_sat', 255, light_int_desc("Grün Saturation Obere Grenze"))
         self.declare_parameter('upgreen_alpha', 255, light_int_desc("Grün Helligkeit Obere Grenze"))
+        self.declare_parameter('min_area', 30, int_desc("Minimum Area for Light"))
+        self.declare_parameter('max_area', 300, int_desc("Maximum Area for Light"))
 
         # Variables
         self.raw_image = None
         self.bridge = CvBridge()
         self.hsv = np.array([])
         self.waitingforgreen = False
+        self.kill_light = False
 
         # definition of the QoS in order to receive data despite WiFi
         qos_policy = rclpy.qos.QoSProfile(
@@ -65,7 +68,7 @@ class camera(Node):
         self.publisher_ = self.create_publisher(Pic, 'pic', 1)
 
         # create timers for data handling
-        self.sign_timer_period = 0.5
+        self.sign_timer_period = 0.25
         self.sign_timer = self.create_timer(
             self.sign_timer_period, self.sign_handler)
 
@@ -90,7 +93,8 @@ class camera(Node):
         y_end = height // 2
 
         roi = img_cv[y_start:y_end, x_start:x_end]
-
+        cv2.imshow("YOLOv8-Erkennung (Confidence > 0.8)", img_cv)
+        cv2.waitKey(1)
         if roi.size == 0:
             self.hsv = None
         else:
@@ -102,7 +106,8 @@ class camera(Node):
         msg = Pic()
 
         # msg.light = self.light_detection()
-        msg.light = ""
+        if self.kill_light is False:
+            msg.light = self.light_detection()
         msg.sign = self.sign_identification()
         self.get_logger().info(str(msg.sign))
 
@@ -139,7 +144,7 @@ class camera(Node):
         status = ""
         if (hsv.size == 0):
             status = ""
-            return
+            return status
 
         # Function for signs - string for Outputs("")
         # min_area = 30  # Minimale fläche für rotes licht
@@ -190,15 +195,16 @@ class camera(Node):
 
         # Statuslogik
         if max_red_area > 0:
-            status = 'red light'
+            status = "red light"
             self.waitingforgreen = True
         if max_green_area >= max_red_area and max_green_area > 0:
-            status = 'green light'
+            status = "green light"
             self.waitingforgreen = False
+            self.kill_light = True
 
-        cv2.imshow("IMG_red", red_mask)
-        cv2.imshow("IMG_green", green_mask)
-        cv2.waitKey(1)
+        # cv2.imshow("IMG_red", red_mask)
+        # cv2.imshow("IMG_green", green_mask)
+        # cv2.waitKey(1)
 
         return status
 
@@ -258,7 +264,7 @@ class camera(Node):
             return ""
 
         image = self.raw_image
-        threshhold = 0.8
+        threshhold = 0.85
         results = model(image, verbose=False)  # kann auch save=True sein
         class_names = model.names
 

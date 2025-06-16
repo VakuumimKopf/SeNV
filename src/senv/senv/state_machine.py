@@ -10,7 +10,6 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
 
 
-
 class state_machine(Node):
     def __init__(self):
         super().__init__('state_machine')
@@ -125,7 +124,6 @@ class state_machine(Node):
             feedback_callback=self.feedback_callback)
 
         self._send_goal_future.add_done_callback(self.goal_response_callback)
-
         self.cancel_await = None
 
     # Awaiting response from action server if request accepted
@@ -133,8 +131,8 @@ class state_machine(Node):
         self.goal_handle_: ClientGoalHandle = future.result()
         if self.goal_handle_.accepted:  # if accepted call goal_result_callback
             self.goal_handle_.get_result_async().add_done_callback(self.goal_result_callback)
-        #timer = threading.Timer(10.0, self.stop)
-        #timer.start()
+        # timer = threading.Timer(10.0, self.stop)
+        # timer.start()
 
     # Feedback from action server
     def feedback_callback(self, feedback):
@@ -230,7 +228,7 @@ class state_machine(Node):
 
         else:
             self.get_logger().info("Error in pic_callback string sign: false value")
-
+        self.state = new_state
         if new_state != old_state:
             self.update_node_state(new_state, info)
 
@@ -244,7 +242,7 @@ class state_machine(Node):
 
         if self.debug_mode is True:
             self.get_logger().info("Übergeben an: " + state)
-
+        
         self.get_logger().info("Wait for cancel response")
 
         while self.cancel_await is None:
@@ -254,7 +252,7 @@ class state_machine(Node):
             self.is_turned_on = False
             self.get_logger().info("Cancel denied")
             return
-
+        
         self.get_logger().info("Cancel accepted")
         #  Start Action with paired action server
         self.send_goal(True, info, self.client_dict[state])
