@@ -15,6 +15,7 @@ class Intersection_con(Node):
 
         # Parameters
         self.turned_on = False
+        self.last_pic_msg = None
 
         # QOS Policy Setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
@@ -59,8 +60,17 @@ class Intersection_con(Node):
         self.turned_on = target
 
         # Execute code as long as node is turned on
-        while self.turned_on is True:
-            self.datahandler(info)
+        if info == "left":
+            while self.turned_on is True:
+                self.datahandler_left()
+        elif info == "right":
+            while self.turned_on is True:
+                self.datahandler_right()
+        elif info == "straight":
+            while self.turned_on is True:
+                self.datahandler_straight()
+        else:
+            self.get_logger().info("Unknown Info in intersection_con...hand back")
 
         # Final Goal State
         goal_handle.succeed()
@@ -77,14 +87,49 @@ class Intersection_con(Node):
     def pic_callback(self, msg):
         if self.turned_on is False:
             return
+        
+        self.last_pic_msg = msg
 
     def laser_callback(self, msg):
         if self.turned_on is False:
             return
 
-    def datahandler(self, info):
-        self.get_logger().info("Handling intersection data")
-        self.get_logger().info(str(info))
+    def datahandler_left(self):
+        
+        if self.last_pic_msg is None:
+            return
+        
+        if self.last_pic_msg.sign == "left":
+            msg = Move()
+            msg.follow = True
+            msg.speed = 1.0
+            msg.turn = 0
+            self.publisher_driver.publish(msg)
+
+
+        else: 
+            msg = Move()
+            msg.follow = False
+            msg.override = True
+            msg.speed = 0.17
+            msg.turn = 0.17
+            self.publisher_driver.publish(msg)
+
+            self.wait_ros2(20)
+
+            self.turned_on = False
+
+    def datahandler_right(self):
+        pass
+
+    def datahandler_straight(self):
+        pass
+
+    def wait_ros2(self, duration):
+        """ROS 2-kompatibles Warten, ohne Callbacks zu blockieren."""
+        start_time = self.get_clock().now().nanoseconds
+        while (self.get_clock().now().nanoseconds - start_time) / 1e9 < duration:
+            rclpy.spin_once(self, timeout_sec=0.1)
 
 
 def main(args=None):

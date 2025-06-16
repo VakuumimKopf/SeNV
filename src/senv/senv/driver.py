@@ -61,6 +61,7 @@ class Driver(Node):
 
         self.last_lane_msg = msg
 
+    # Translate the Move msg into a Twist msg
     def build_drive_msg(self):
 
         if self.last_drive_msg is None or self.last_lane_msg is None:
@@ -72,9 +73,15 @@ class Driver(Node):
         speed = 0.0
         turn = 0.0
 
-        if last_drive_msg.follow is True:
+        # Check if the con_node wants to use custom speed and turn values
+        if last_drive_msg.override is True:
+            turn = last_drive_msg.turn
+            speed = last_drive_msg.speed
 
-            middle = 320
+        # Check if the con_node wants to use the lane_detect funcionality
+        elif last_drive_msg.follow is True:
+
+            middle = 320  # dont change
             area_short = 15
             area_long = 35
 
@@ -103,12 +110,15 @@ class Driver(Node):
                 turn = 0.0
 
             speed = 0.2*(1-abs(turn))
+
         else:
             if last_drive_msg.turn == 1:
                 speed = 0.0
                 turn = 0.1
 
+        #  Build Twist msg with calculated turn and speed
         msg = Twist()
+        #  Add the speed requested
         msg.angular.z = turn * self.last_drive_msg.speed
         msg.linear.x = speed * self.last_drive_msg.speed
 
