@@ -103,6 +103,7 @@ class state_machine(Node):
             "intersection": self.intersection_client,
             "crosswalk": self.crosswalk_client,
         }
+        self.get_logger().info("State machine initialized")
 
     # region action client
 

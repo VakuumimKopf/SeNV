@@ -21,7 +21,7 @@ class Crosswalk_con(Node):
         self.last_pic_msg = None
         self.bridge = CvBridge()
         self.raw_image = None
-        self.model = YOLO("/home/oliver/senv_ws/src/senv/senv/human.pt")
+        self.model = YOLO("/home/lennart/ros2_ws/src/senv/senv/human.pt")
         self.x1 = 0
         self.x2 = 0
 
@@ -118,7 +118,7 @@ class Crosswalk_con(Node):
 
             msg = Move()
             msg.follow = False
-            msg.speed = 0
+            msg.speed = 0.0
             msg.turn = 0
             self.publisher_driver.publish(msg)
 
@@ -128,13 +128,13 @@ class Crosswalk_con(Node):
             if person_there is True:
                 msg = Move()
                 msg.follow = False
-                msg.speed = 0
+                msg.speed = 0.0
                 msg.turn = 0
                 self.publisher_driver.publish(msg)
             else:
                 msg = Move()
                 msg.follow = True
-                msg.speed = 1
+                msg.speed = 1.0
                 msg.turn = 0
                 self.publisher_driver.publish(msg)
 
@@ -168,7 +168,8 @@ class Crosswalk_con(Node):
         # IDs of the detected classes (e.g. 0, 1, 2 …)
         class_ids = results[0].boxes.cls.cpu().numpy().astype(int)
         # x and y coordinates of the bounding boxes, for position of human while crossing
-        #self.x1, self.y1, self.x2, self.y2 = results[0].boxes.xyxy.cpu().numpy()
+        self.x1, y1, self.x2, y2 = results[0].boxes.xyxy.cpu().numpy()
+        self.get_logger().info()(f"Detected Human at x1: {self.x1}, y1: {y1}, x2: {self.x2}, y2: {y2}")
         # folter for signs with a probability of at least 0.8
         high_conf_indices = [i for i, conf in enumerate(results[0].boxes.conf.cpu().numpy())
                              if conf > threshhold]

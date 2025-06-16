@@ -11,7 +11,7 @@ from senv.description import light_int_desc
 from ultralytics import YOLO
 
 # load model
-model = YOLO("/home/oliver/senv_ws/src/senv/senv/best3.0.pt")
+model = YOLO("/home/lennart/ros2_ws/src/senv/senv/best3.0.pt")
 
 
 class camera(Node):
@@ -101,7 +101,7 @@ class camera(Node):
 
         msg = Pic()
 
-        #msg.light = self.light_detection()
+        # msg.light = self.light_detection()
         msg.light = ""
         msg.sign = self.sign_identification()
         self.get_logger().info(str(msg.sign))
