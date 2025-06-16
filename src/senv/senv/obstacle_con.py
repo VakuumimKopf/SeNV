@@ -14,7 +14,7 @@ from senv.description import float_desc, int_desc, light_int_desc, bool_desc
 class obstacle_con(Node):
     def __init__(self):
         super().__init__('obstacle_con')
-        self.get_logger().info("Obstacle avoidance node started")
+        self.get_logger().info("obstacle_con node started")
         # Parameters
         self.declare_parameter('distance_to_obstacle', 0.6, float_desc(
             "Gewünschter Abstand zum Objekt"))
