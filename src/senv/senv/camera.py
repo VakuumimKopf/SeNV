@@ -294,8 +294,8 @@ class camera(Node):
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
 
         # Zeige das bearbeitete Bild mit nur den gefilterten Erkennungen
-        cv2.imshow("YOLOv8-Erkennung (Confidence > 0.8)", image)
-        cv2.waitKey(1)
+        # cv2.imshow("YOLOv8-Erkennung (Confidence > 0.8)", image)
+        # cv2.waitKey(1)
         
         filtered_class_ids = [class_ids[i] for i in high_conf_indices]
         detected_labels = [class_names[i] for i in filtered_class_ids]

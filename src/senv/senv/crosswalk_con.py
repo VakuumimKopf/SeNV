@@ -27,6 +27,9 @@ class Crosswalk_con(Node):
         self.crossed = False
         self.saw_person_once = False
         self.start_pos = -1
+        self.count = 0
+        self.turned = False
+        self.threshold = 641
         # QOS Policy Setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
@@ -84,9 +87,12 @@ class Crosswalk_con(Node):
         self.raw_image = None
         self.middle_x = 0.0
         self.crossed = False
+        self.stop_the_turn = False
         self.saw_person_once = False
         self.start_pos = -1
-
+        self.count = 0
+        self.turned = False
+        self.threshold = 641
         self.get_logger().info("Hand back")
 
         # Final Goal State
@@ -119,20 +125,24 @@ class Crosswalk_con(Node):
             return
 
     def datahandler(self, info):
-
         if self.last_pic_msg is None or self.raw_image is None:
             return
-        
         msg = Move()
         person_there = self.detect_human()
         middle_x = self.middle_x
-        person_from_center = abs(middle_x - 320)
-        threshold = person_from_center + 200
         self.get_logger().info("Human: " + str(person_there))
+        self.get_logger().info(f"Detected Human at x: {self.middle_x}")
 
         if self.saw_person_once is False and person_there:
-            self.start_pos = middle_x
+            msg.follow = False
+            msg.speed = 0.0
+            msg.turn = 0
+            self.publisher_driver.publish(msg)
+            self.detect_human()
+            self.start_pos = self.middle_x
             self.saw_person_once = True
+            person_from_center = abs(middle_x - 320)
+            self.threshold = person_from_center + 75
 
         if self.last_pic_msg.sign == "crosswalk" and person_there:
 
@@ -143,13 +153,14 @@ class Crosswalk_con(Node):
             self.publisher_driver.publish(msg)
             if self.crossed is False:
                 self.get_logger().info(f"Starting Position: {self.start_pos}")
-                if 10 >= abs(threshold - abs(self.start_pos-middle_x)) >= 0 and person_there:
+                if 10 >= abs(self.threshold - abs(self.start_pos-middle_x)) >= 0 and person_there:
                     self.get_logger().info("Crossing Far")
                     self.crossed = True
                     msg.follow = True
                     msg.speed = 0.5
                     msg.turn = 0
                     self.publisher_driver.publish(msg)
+                    self.turned_on = False
             else:
                 msg.follow = True
                 msg.speed = 0.5
@@ -164,6 +175,23 @@ class Crosswalk_con(Node):
             msg.turn = 0
             self.publisher_driver.publish(msg)
             self.get_logger().info("Crosswalk")
+            self.count += 1
+            '''
+            if self.count > 15:
+                msg.follow = False
+                msg.override = True
+                msg.speed = 1.0
+                msg.speed_o = 0.0
+                msg.turn_o = 0.2
+                i = 0
+                while not person_there and i < 10:
+
+                    person_there = self.detect_human()
+                    self.publisher_driver.publish(msg)
+                    i += 1
+                    self.get_logger().info("Biele in Hallo")
+                    self.wait_ros2(0.1)
+            '''
 
         elif self.last_pic_msg != "crosswalk" and person_there:
             msg.follow = False
@@ -172,13 +200,15 @@ class Crosswalk_con(Node):
             self.get_logger().info("Human")
             self.publisher_driver.publish(msg)
             if self.crossed is False:
-                if 10 >= abs(threshold - abs(self.start_pos-middle_x)) >= 0 and person_there:
+                self.get_logger().info(f"Starting Position: {self.start_pos}")
+                if 10 >= abs(self.threshold - abs(self.start_pos-middle_x)) >= 0 and person_there:
                     self.get_logger().info("Crossing close")
                     self.crossed = True
                     msg.follow = True
                     msg.speed = 0.5
                     msg.turn = 0
                     self.publisher_driver.publish(msg)
+                    self.turned_on = False
             else:
                 msg.follow = True
                 msg.speed = 0.5
@@ -232,7 +262,6 @@ class Crosswalk_con(Node):
         else:
             x1, y1, x2, y2 = map(int, xyxy[0])
             self.middle_x = (x1 + x2) / 2
-            self.get_logger().info(f"Detected Human at x1: {x1}, y1: {y1}, x2: {x2}, y2: {y2}")
             '''
             label = f"{class_names[class_ids[0]]}: {results[0].boxes.conf.cpu().numpy()[0]:.2f}"
 
@@ -247,6 +276,12 @@ class Crosswalk_con(Node):
             cv2.waitKey(1)
             '''
             return True
+
+    def wait_ros2(self, duration):
+        """ROS 2-kompatibles Warten, ohne Callbacks zu blockieren."""
+        start_time = self.get_clock().now().nanoseconds
+        while (self.get_clock().now().nanoseconds - start_time) / 1e9 < duration:
+            rclpy.spin_once(self, timeout_sec=0.1)
 
 
 def main(args=None):
