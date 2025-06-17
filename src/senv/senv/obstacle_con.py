@@ -5,8 +5,6 @@ from geometry_msgs.msg import Twist
 from rclpy.action.server import ServerGoalHandle
 from senv_interfaces.msg import Pic, Laser
 from senv_interfaces.action import ConTask
-import time
-from senv.stopper import Stopper
 from std_msgs.msg import String
 from senv.description import float_desc, int_desc, light_int_desc, bool_desc
 

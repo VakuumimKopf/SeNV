@@ -85,7 +85,7 @@ class Lane_con(Node):
     def datahandler(self, info):
         msg = Move()
         msg.follow = True
-        msg.speed = 1.0
+        msg.speed = 0.5
         msg.turn = 0
         self.publisher_driver.publish(msg)
 

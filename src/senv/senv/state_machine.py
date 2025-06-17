@@ -121,7 +121,7 @@ class state_machine(Node):
 
         self._send_goal_future = client.send_goal_async(
             goal,
-            feedback_callback=self.feedback_callback)
+            feedback_callback=self.feedback_callback),
 
         self._send_goal_future.add_done_callback(self.goal_response_callback)
         self.cancel_await = None
@@ -131,8 +131,7 @@ class state_machine(Node):
         self.goal_handle_: ClientGoalHandle = future.result()
         if self.goal_handle_.accepted:  # if accepted call goal_result_callback
             self.goal_handle_.get_result_async().add_done_callback(self.goal_result_callback)
-        # timer = threading.Timer(10.0, self.stop)
-        # timer.start()
+ 
 
     # Feedback from action server
     def feedback_callback(self, feedback):
@@ -141,12 +140,12 @@ class state_machine(Node):
     # Sending Shutdown to action server
     def shutdown_action(self):
         self.get_logger().info("Canceling action server...")
-        future = self.goal_handle_.cancel_goal_async()
-        future.add_done_callback(self.cancel_done)
+        cancel_future = self.goal_handle_.cancel_goal_async()
+        cancel_future.add_done_callback(self.cancel_done)
 
     #  Waiting for confimation to shut down
-    def cancel_done(self, future):
-        cancel_response = future.result()
+    def cancel_done(self, cancel_future):
+        cancel_response = cancel_future.result()
         if len(cancel_response.goals_canceling) > 0:
             self.get_logger().info('Goal successfully canceled')
             self.cancel_await = True
@@ -161,6 +160,7 @@ class state_machine(Node):
         self.get_logger().info("Result:" + str(result.finished))
         self.is_turned_on = True
         self.cancel_await = None
+        self.goal_handle_ = None
 
     # endregion
 
@@ -235,26 +235,25 @@ class state_machine(Node):
     # Update node state if changed
     def update_node_state(self, state, info):
 
-        self.get_logger().info(str(self.cancel_await))
-
         if self.goal_handle_ is not None:
             self.shutdown_action()
 
+            self.get_logger().info("Wait for cancel response")
+
+            while self.cancel_await is None:
+                pass
+
+            if self.cancel_await is False:
+                self.is_turned_on = False
+                self.get_logger().info("Cancel denied")
+                return
+
+            self.get_logger().info("Cancel accepted")
+            #  Start Action with paired action server
+
         if self.debug_mode is True:
             self.get_logger().info("Übergeben an: " + state)
-        
-        self.get_logger().info("Wait for cancel response")
 
-        while self.cancel_await is None:
-            pass
-
-        if self.cancel_await is False:
-            self.is_turned_on = False
-            self.get_logger().info("Cancel denied")
-            return
-        
-        self.get_logger().info("Cancel accepted")
-        #  Start Action with paired action server
         self.send_goal(True, info, self.client_dict[state])
 
         #  Update state of the node and publish
