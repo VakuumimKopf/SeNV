@@ -281,10 +281,14 @@ class camera(Node):
         if not high_conf_indices:
             return ""
         # Display signs with over 80% in another image
-        
+
         # manual display of filtered signs
         for i in high_conf_indices:
             x1, y1, x2, y2 = map(int, xyxy[i])
+            # filter signs that are too small/too far away
+            if abs(y1 - y2) < 40:
+                # self.get_logger().info("Sign was too small")
+                del high_conf_indices[i]
             label = f"{class_names[class_ids[i]]}: {results[0].boxes.conf.cpu().numpy()[i]:.2f}"
 
             # Zeichne Rechteck
@@ -296,13 +300,14 @@ class camera(Node):
         # Zeige das bearbeitete Bild mit nur den gefilterten Erkennungen
         # cv2.imshow("YOLOv8-Erkennung (Confidence > 0.8)", image)
         # cv2.waitKey(1)
-        
+
         filtered_class_ids = [class_ids[i] for i in high_conf_indices]
         detected_labels = [class_names[i] for i in filtered_class_ids]
         # when there is no sign detected, the list is empty
         if detected_labels == []:
             return ""
         # self.get_logger().info(f"Detected Sign is {detected_labels}")
+        if abs(y1 -y2) >= 
         return detected_labels[0]
 
 
