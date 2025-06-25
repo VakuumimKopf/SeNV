@@ -30,6 +30,7 @@ class Crosswalk_con(Node):
         self.count = 0
         self.turned = False
         self.threshold = 641
+        self.seen_sign = False
         # QOS Policy Setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
@@ -93,6 +94,7 @@ class Crosswalk_con(Node):
         self.count = 0
         self.turned = False
         self.threshold = 641
+        self.seen_sign = False
         self.get_logger().info("Hand back")
 
         # Final Goal State
@@ -151,6 +153,7 @@ class Crosswalk_con(Node):
             msg.turn = 0
             self.get_logger().info("Crosswalk and Human")
             self.publisher_driver.publish(msg)
+            self.seen_sign = True
             if self.crossed is False:
                 self.get_logger().info(f"Starting Position: {self.start_pos}")
                 if 10 >= abs(self.threshold - abs(self.start_pos-middle_x)) >= 0 and person_there:
@@ -167,6 +170,7 @@ class Crosswalk_con(Node):
                 msg.turn = 0
                 self.publisher_driver.publish(msg)
                 self.turned_on = False
+                return 
             # person_there = self.detect_human()
 
         elif self.last_pic_msg.sign == "crosswalk" and not person_there:
@@ -193,7 +197,7 @@ class Crosswalk_con(Node):
                     self.wait_ros2(0.1)
             '''
 
-        elif self.last_pic_msg != "crosswalk" and person_there:
+        elif (self.last_pic_msg != "crosswalk" or self.seen_sign) and person_there:
             msg.follow = False
             msg.speed = 0.0
             msg.turn = 0

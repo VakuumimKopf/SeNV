@@ -121,7 +121,7 @@ class state_machine(Node):
 
         self._send_goal_future = client.send_goal_async(
             goal,
-            feedback_callback=self.feedback_callback),
+            feedback_callback=self.feedback_callback)
 
         self._send_goal_future.add_done_callback(self.goal_response_callback)
         self.cancel_await = None
@@ -131,7 +131,6 @@ class state_machine(Node):
         self.goal_handle_: ClientGoalHandle = future.result()
         if self.goal_handle_.accepted:  # if accepted call goal_result_callback
             self.goal_handle_.get_result_async().add_done_callback(self.goal_result_callback)
- 
 
     # Feedback from action server
     def feedback_callback(self, feedback):
@@ -228,7 +227,7 @@ class state_machine(Node):
 
         else:
             self.get_logger().info("Error in pic_callback string sign: false value")
-        self.state = new_state
+
         if new_state != old_state:
             self.update_node_state(new_state, info)
 
