@@ -9,6 +9,7 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge
 from ultralytics import YOLO
+import cv2
 
 
 class Crosswalk_con(Node):
@@ -22,9 +23,10 @@ class Crosswalk_con(Node):
         self.bridge = CvBridge()
         self.raw_image = None
         self.model = YOLO("/home/oliver/senv_ws/src/senv/senv/human.pt")
-        self.x1 = 0
-        self.x2 = 0
-
+        self.middle_x = 0.0
+        self.crossed = False
+        self.saw_person_once = False
+        self.start_pos = -1
         # QOS Policy Setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
@@ -78,6 +80,13 @@ class Crosswalk_con(Node):
         while self.turned_on is True:
             self.datahandler(info)
 
+        self.last_pic_msg = None
+        self.raw_image = None
+        self.middle_x = 0.0
+        self.crossed = False
+        self.saw_person_once = False
+        self.start_pos = -1
+
         self.get_logger().info("Hand back")
 
         # Final Goal State
@@ -113,39 +122,78 @@ class Crosswalk_con(Node):
 
         if self.last_pic_msg is None or self.raw_image is None:
             return
+        
+        msg = Move()
+        person_there = self.detect_human()
+        middle_x = self.middle_x
+        person_from_center = abs(middle_x - 320)
+        threshold = person_from_center + 200
+        self.get_logger().info("Human: " + str(person_there))
 
-        if self.last_pic_msg.sign != "crosswalk":
+        if self.saw_person_once is False and person_there:
+            self.start_pos = middle_x
+            self.saw_person_once = True
 
-            msg = Move()
+        if self.last_pic_msg.sign == "crosswalk" and person_there:
+
             msg.follow = False
-            msg.speed = 0
+            msg.speed = 0.0
+            msg.turn = 0
+            self.get_logger().info("Crosswalk and Human")
+            self.publisher_driver.publish(msg)
+            if self.crossed is False:
+                self.get_logger().info(f"Starting Position: {self.start_pos}")
+                if 10 >= abs(threshold - abs(self.start_pos-middle_x)) >= 0 and person_there:
+                    self.get_logger().info("Crossing Far")
+                    self.crossed = True
+                    msg.follow = True
+                    msg.speed = 0.5
+                    msg.turn = 0
+                    self.publisher_driver.publish(msg)
+            else:
+                msg.follow = True
+                msg.speed = 0.5
+                msg.turn = 0
+                self.publisher_driver.publish(msg)
+                self.turned_on = False
+            # person_there = self.detect_human()
+
+        elif self.last_pic_msg.sign == "crosswalk" and not person_there:
+            msg.follow = True
+            msg.speed = 0.5
             msg.turn = 0
             self.publisher_driver.publish(msg)
+            self.get_logger().info("Crosswalk")
 
-            person_there = self.detect_human()
-            self.get_logger().info("Human: " + str(person_there))
-
-            if person_there is True:
-                msg = Move()
-                msg.follow = False
-                msg.speed = 0
-                msg.turn = 0
-                self.publisher_driver.publish(msg)
+        elif self.last_pic_msg != "crosswalk" and person_there:
+            msg.follow = False
+            msg.speed = 0.0
+            msg.turn = 0
+            self.get_logger().info("Human")
+            self.publisher_driver.publish(msg)
+            if self.crossed is False:
+                if 10 >= abs(threshold - abs(self.start_pos-middle_x)) >= 0 and person_there:
+                    self.get_logger().info("Crossing close")
+                    self.crossed = True
+                    msg.follow = True
+                    msg.speed = 0.5
+                    msg.turn = 0
+                    self.publisher_driver.publish(msg)
             else:
-                msg = Move()
                 msg.follow = True
-                msg.speed = 1
+                msg.speed = 0.5
                 msg.turn = 0
                 self.publisher_driver.publish(msg)
-
                 self.turned_on = False
 
         else:
             msg = Move()
             msg.follow = True
-            msg.speed = 1
+            msg.speed = 0.5
             msg.turn = 0
             self.publisher_driver.publish(msg)
+            self.turned_on = False
+            self.get_logger().info("Nothing")
 
     def detect_human(self):
         """
@@ -157,7 +205,7 @@ class Crosswalk_con(Node):
             return
 
         # threshhold/least confidence of detected signs
-        threshhold = 0.8
+        threshhold = 0.7
         # get the image from the camera as np.array
         image = self.raw_image
         # Prediction (Inference)
@@ -168,14 +216,13 @@ class Crosswalk_con(Node):
         # IDs of the detected classes (e.g. 0, 1, 2 …)
         class_ids = results[0].boxes.cls.cpu().numpy().astype(int)
         # x and y coordinates of the bounding boxes, for position of human while crossing
-        #self.x1, self.y1, self.x2, self.y2 = results[0].boxes.xyxy.cpu().numpy()
         # folter for signs with a probability of at least 0.8
         high_conf_indices = [i for i, conf in enumerate(results[0].boxes.conf.cpu().numpy())
                              if conf > threshhold]
         # if there is no sign with at least 80% recognition
         if not high_conf_indices:
             return False
-
+        xyxy = results[0].boxes.xyxy.cpu().numpy()
         filtered_class_ids = [class_ids[i] for i in high_conf_indices]
         detected_labels = [class_names[i] for i in filtered_class_ids]
         # when there is no sign detected, the list is empty
@@ -183,6 +230,22 @@ class Crosswalk_con(Node):
             return False
         # self.get_logger().info(f"Detected Sign is {detected_labels}")
         else:
+            x1, y1, x2, y2 = map(int, xyxy[0])
+            self.middle_x = (x1 + x2) / 2
+            self.get_logger().info(f"Detected Human at x1: {x1}, y1: {y1}, x2: {x2}, y2: {y2}")
+            '''
+            label = f"{class_names[class_ids[0]]}: {results[0].boxes.conf.cpu().numpy()[0]:.2f}"
+
+            # Zeichne Rechteck
+            cv2.rectangle(image, (self.x1, y1), (self.x2, y2), (255, 0, 0), 2)
+            # Zeichne Label
+            cv2.putText(image, label, (self.x1, y1 - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+
+            # Zeige das bearbeitete Bild mit nur den gefilterten Erkennungen
+            cv2.imshow("YOLOv8-Erkennung (Confidence > 0.8)", image)
+            cv2.waitKey(1)
+            '''
             return True
 
 
