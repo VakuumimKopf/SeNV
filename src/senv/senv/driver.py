@@ -17,6 +17,7 @@ class Driver(Node):
 
         self.last_drive_msg = None
         self.last_lane_msg = None
+        self.turned_on = True
 
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
@@ -65,6 +66,9 @@ class Driver(Node):
     def build_drive_msg(self):
 
         if self.last_drive_msg is None or self.last_lane_msg is None:
+            return
+        
+        if self.turned_on is False:
             return
 
         last_drive_msg = self.last_drive_msg
@@ -129,6 +133,7 @@ class Driver(Node):
 
     def publish_stop(self):
         if rclpy.ok():
+            self.turned_on = False
             msg = Twist()
             msg.linear.x = 0.0
             msg.angular.z = 0.0

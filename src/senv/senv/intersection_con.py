@@ -128,7 +128,7 @@ class Intersection_con(Node):
 
             self.turned_on = False
 
-        elif self.last_pic_msg.sign == "right":
+        elif self.last_pic_msg.sign == "left":
             msg = Move()
             msg.follow = True
             msg.speed = 0.5
@@ -206,7 +206,7 @@ class Intersection_con(Node):
 
             self.turned_on = False
 
-        elif self.last_pic_msg.sign == "right":
+        elif self.last_pic_msg.sign == "straight":
             msg = Move()
             msg.follow = True
             msg.speed = 0.5
