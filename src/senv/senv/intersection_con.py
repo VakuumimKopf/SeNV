@@ -16,6 +16,7 @@ class Intersection_con(Node):
         # Parameters
         self.turned_on = False
         self.last_pic_msg = None
+        self.counter_voting = 0
 
         # QOS Policy Setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
@@ -63,9 +64,12 @@ class Intersection_con(Node):
         if info == "left":
             while self.turned_on is True:
                 self.datahandler_left()
+                self.wait_ros2(0.3)
         elif info == "right":
             while self.turned_on is True:
                 self.datahandler_right()
+                self.wait_ros2(0.3)
+
         elif info == "straight":
             while self.turned_on is True:
                 self.datahandler_straight()
@@ -78,16 +82,19 @@ class Intersection_con(Node):
         # Result
         result = ConTask.Result()
         result.finished = True
+        self.counter_voting = 0
         return result
 
     def cancel_callback(self, goal_handle):
-        self.turned_on = False
-        return CancelResponse.ACCEPT
+        if self.turned_on is True:
+            return CancelResponse.REJECT
+        else:
+            return CancelResponse.ACCEPT
 
     def pic_callback(self, msg):
         if self.turned_on is False:
             return
-        
+
         self.last_pic_msg = msg
 
     def laser_callback(self, msg):
@@ -95,35 +102,121 @@ class Intersection_con(Node):
             return
 
     def datahandler_left(self):
-        
+
         if self.last_pic_msg is None:
             return
-        
-        if self.last_pic_msg.sign == "left":
-            msg = Move()
-            msg.follow = True
-            msg.speed = 1.0
-            msg.turn = 0
-            self.publisher_driver.publish(msg)
 
+        self.get_logger().info("Votes" + str(self.counter_voting))
 
-        else: 
+        if self.counter_voting == 3:
             msg = Move()
             msg.follow = False
             msg.override = True
-            msg.speed = 0.17
-            msg.turn = 0.17
+            msg.speed = 1.0
+            msg.speed_o = 0.10
+            msg.turn_o = 0.17
             self.publisher_driver.publish(msg)
 
-            self.wait_ros2(20)
+            self.wait_ros2(5.0)
+
+            self.get_logger().info("Finished")
+
+            msg = Move()
+            msg.follow = True
+            msg.speed = 0.5
+            self.publisher_driver.publish(msg)
 
             self.turned_on = False
 
+        elif self.last_pic_msg.sign == "right":
+            msg = Move()
+            msg.follow = True
+            msg.speed = 0.5
+            msg.turn = 0
+            self.publisher_driver.publish(msg)
+
+            self.counter_voting = 0
+
+        else:
+            self.counter_voting = self.counter_voting + 1
+
     def datahandler_right(self):
-        pass
+
+        if self.last_pic_msg is None:
+            return
+
+        self.get_logger().info("Votes" + str(self.counter_voting))
+
+        if self.counter_voting == 3:
+            msg = Move()
+            msg.follow = False
+            msg.override = True
+            msg.speed = 1.0
+            msg.speed_o = 0.05
+            msg.turn_o = -0.17
+            self.publisher_driver.publish(msg)
+
+            self.wait_ros2(5.0)
+
+            self.get_logger().info("Finished")
+
+            msg = Move()
+            msg.follow = True
+            msg.speed = 0.5
+            self.publisher_driver.publish(msg)
+
+            self.turned_on = False
+
+        elif self.last_pic_msg.sign == "right":
+            msg = Move()
+            msg.follow = True
+            msg.speed = 0.5
+            msg.turn = 0
+            self.publisher_driver.publish(msg)
+
+            self.counter_voting = 0
+
+        else:
+            self.counter_voting = self.counter_voting + 1
 
     def datahandler_straight(self):
-        pass
+        
+        if self.last_pic_msg is None:
+            return
+
+        self.get_logger().info("Votes" + str(self.counter_voting))
+
+        if self.counter_voting == 3:
+            msg = Move()
+            msg.follow = False
+            msg.override = True
+            msg.speed = 1.0
+            msg.speed_o = 0.17
+            msg.turn_o = 0.0
+            self.publisher_driver.publish(msg)
+
+            self.wait_ros2(5.0)
+
+            self.get_logger().info("Finished")
+
+            msg = Move()
+            msg.follow = True
+            msg.speed = 0.5
+            self.publisher_driver.publish(msg)
+
+            self.turned_on = False
+
+        elif self.last_pic_msg.sign == "right":
+            msg = Move()
+            msg.follow = True
+            msg.speed = 0.5
+            msg.turn = 0
+            self.publisher_driver.publish(msg)
+
+            self.counter_voting = 0
+
+        else:
+            self.counter_voting = self.counter_voting + 1
 
     def wait_ros2(self, duration):
         """ROS 2-kompatibles Warten, ohne Callbacks zu blockieren."""
