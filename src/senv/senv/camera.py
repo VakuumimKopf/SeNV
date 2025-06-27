@@ -11,7 +11,7 @@ from senv.description import light_int_desc, int_desc
 from ultralytics import YOLO
 
 # load model
-model = YOLO("/home/oliver/senv_ws/src/senv/senv/best3.0.pt")
+model = YOLO("/home/hans/ros2_ws/src/SeNV/src/senv/senv/best3.0.pt")
 
 
 class camera(Node):
