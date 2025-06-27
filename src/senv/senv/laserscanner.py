@@ -6,6 +6,7 @@ from std_msgs.msg import String
 from sensor_msgs.msg import LaserScan
 from senv_interfaces.msg import Laser
 from senv.description import float_desc, int_desc, bool_desc, light_int_desc
+import array
 
 
 class laserscanner(rclpy.node.Node):
@@ -20,6 +21,7 @@ class laserscanner(rclpy.node.Node):
         self.back_right_distance = 0.0
         self.right_distance = 0.0
         self.front_right_distance = 0.0
+        self.raw = []
 
         # definition of the parameters that can be changed at runtime
         self.declare_parameter('distance_to_turn', 0.45)
@@ -27,7 +29,7 @@ class laserscanner(rclpy.node.Node):
         self.declare_parameter('speed_turn', 0.5)
         self.declare_parameter('laser_front', 0)
         self.declare_parameter('turn_time', 2.0)
-        
+
         # must ideally equal to an integer when divided by timer_period
         self.img_row = np.random.randint(0, 256, 640, dtype=np.uint8)
 
@@ -81,7 +83,7 @@ class laserscanner(rclpy.node.Node):
         self.back_right_distance = msg.ranges[450]
         self.right_distance = msg.ranges[540]
         self.front_right_distance = msg.ranges[630]
-
+        self.raw = array.array('d', msg.ranges)
         # saving the required sensor value, no further processing at this point
         self.front_distance = msg.ranges[self.get_parameter('laser_front')
                                          .get_parameter_value().integer_value]
@@ -99,8 +101,9 @@ class laserscanner(rclpy.node.Node):
         msg._back_right_distance = self.back_right_distance
         msg.right_distance = self.right_distance
         msg.front_right_distance = self.front_right_distance
+        msg.raw = self.raw
         self.publisher_laserturn.publish(msg)
-        # self.get_logger().info("laserscanner : " + str(msg.right_distance))
+        #  self.get_logger().info("laserscanner : " + str(msg.raw))
 
 
 def main(args=None):
