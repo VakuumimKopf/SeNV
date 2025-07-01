@@ -22,7 +22,7 @@ class Crosswalk_con(Node):
         self.last_pic_msg = None
         self.bridge = CvBridge()
         self.raw_image = None
-        self.model = YOLO("/home/oliver/senv_ws/src/senv/senv/human.pt")
+        self.model = YOLO("/home/nlaaser/ros2_ws/src/senv/src/senv/senv/best3.0.pt")
         self.middle_x = 0.0
         self.crossed = False
         self.saw_person_once = False

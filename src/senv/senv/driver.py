@@ -126,8 +126,8 @@ class Driver(Node):
         msg.angular.z = turn * self.last_drive_msg.speed
         msg.linear.x = speed * self.last_drive_msg.speed
 
-        self.get_logger().info(str(msg.angular.z))
-        self.get_logger().info(str(msg.linear.x))
+        # self.get_logger().info(str(msg.angular.z))
+        # self.get_logger().info(str(msg.linear.x))
 
         self.publisher_driver.publish(msg)
 
