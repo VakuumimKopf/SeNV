@@ -22,7 +22,9 @@ class Crosswalk_con(Node):
         self.last_pic_msg = None
         self.bridge = CvBridge()
         self.raw_image = None
+
         self.model = YOLO("/home/nlaaser/ros2_ws/src/senv/src/senv/senv/best3.0.pt")
+
         self.middle_x = 0.0
         self.crossed = False
         self.saw_person_once = False
@@ -170,7 +172,7 @@ class Crosswalk_con(Node):
                 msg.turn = 0
                 self.publisher_driver.publish(msg)
                 self.turned_on = False
-                return 
+                return
             # person_there = self.detect_human()
 
         elif self.last_pic_msg.sign == "crosswalk" and not person_there:

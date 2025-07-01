@@ -29,6 +29,9 @@ class state_machine(Node):
         # Action trigger parameter
         self.intersection_con_triggers = ["left", "right", "straight"]
 
+        # Activation if an green trafficlight has been seen
+        self.green_seen = False
+
         # Qos policy setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
@@ -188,6 +191,12 @@ class state_machine(Node):
         # Get current state
         old_state = self.state
         new_state = None
+        if self.green_seen is False:
+            if last_pic_msg.light == "green light":
+                self.green_seen = True
+                self.get_logger().info("Grün war")
+            self.get_logger().info("Warte auf Grün")
+            return
 
         if last_laser_msg.front_distance <= 0.5 and last_laser_msg.front_distance != 0.0:
 
@@ -220,7 +229,7 @@ class state_machine(Node):
             self.state = new_state
             return
 
-        elif last_pic_msg.sign == "green light" and old_state == "wait_for_green":
+        elif (last_pic_msg.sign == "green light" and old_state == "wait_for_green") or self.green_seen is True:
 
             new_state = "lane"
             info = ""

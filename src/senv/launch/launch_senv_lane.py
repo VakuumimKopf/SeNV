@@ -52,7 +52,7 @@ def generate_launch_description():
             emulate_tty=True,
             arguments=[('__log_level:=debug')],
         ),
-                Node(
+        Node(
             package='senv',
             executable='crosswalk_con',
             # activate output

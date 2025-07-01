@@ -22,13 +22,14 @@ class laserscanner(rclpy.node.Node):
         self.right_distance = 0.0
         self.front_right_distance = 0.0
         self.raw = []
+        
         # definition of the parameters that can be changed at runtime
         self.declare_parameter('distance_to_turn', 0.45)
         self.declare_parameter('speed_drive', 0.15)
         self.declare_parameter('speed_turn', 0.5)
         self.declare_parameter('laser_front', 0)
         self.declare_parameter('turn_time', 2.0)
-        
+
         # must ideally equal to an integer when divided by timer_period
         self.img_row = np.random.randint(0, 256, 640, dtype=np.uint8)
 
@@ -74,6 +75,7 @@ class laserscanner(rclpy.node.Node):
             self.front_angle = rounded[630:720].index(min_front)
         # self.front_angle = rounded[0:90].index(min_front) or rounded[630:720].index(min_front)
         '''
+
         if msg is not None:
             # self.get_logger().info("Laserscan exists")
             self.front_distance = msg.ranges[0]
@@ -108,7 +110,6 @@ class laserscanner(rclpy.node.Node):
         msg.front_right_distance = self.front_right_distance
         msg.raw = self.raw
         self.publisher_laserturn.publish(msg)
-        
 
 
 def main(args=None):
