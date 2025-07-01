@@ -73,6 +73,8 @@ class Intersection_con(Node):
         elif info == "straight":
             while self.turned_on is True:
                 self.datahandler_straight()
+                self.wait_ros2(0.3)
+
         else:
             self.get_logger().info("Unknown Info in intersection_con...hand back")
 

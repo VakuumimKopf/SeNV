@@ -243,10 +243,11 @@ class state_machine(Node):
     # Update node state if changed
     def update_node_state(self, state, info):
 
-        if self.goal_handle_ is not None:
+        if self.state == "lane":
+
             self.shutdown_action()
 
-            self.get_logger().info("Wait for cancel response")
+            self.get_logger().info("Wait for cancel response from lane")
 
             while self.cancel_await is None:
                 pass
@@ -263,6 +264,9 @@ class state_machine(Node):
             self.get_logger().info("Übergeben an: " + state)
 
         self.send_goal(True, info, self.client_dict[state])
+
+        if state != "lane":
+            self.is_turned_on = False
 
         #  Update state of the node and publish
         self.state = state
