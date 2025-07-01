@@ -11,7 +11,7 @@ from senv.description import light_int_desc, int_desc
 from ultralytics import YOLO
 
 # load model
-model = YOLO("/home/oliver/senv_ws/src/senv/senv/best3.0.pt")
+model = YOLO("/home/nlaaser/ros2_ws/src/senv/src/senv/senv/best3.0.pt")
 
 
 class camera(Node):
@@ -77,7 +77,7 @@ class camera(Node):
 
         #  Converting raw data into np.array
 
-        img_cv = self.bridge.compressed_imgmsg_to_cv2(data, desired_encoding='passthrough')
+        img_cv = cv2.blur(self.bridge.compressed_imgmsg_to_cv2(data, desired_encoding='passthrough'), (5, 5))
 
         # just the image for later use (in sign_identification)
         self.raw_image = img_cv
@@ -87,7 +87,7 @@ class camera(Node):
 
         # Speichere HSV für farbanalyse in sign detection
         # Bereich: rechtes Drittel, mittleres Drittel vertikal
-        x_start = width * 2 // 3
+        x_start = width // 2
         x_end = width
         y_start = height // 4
         y_end = height // 2
@@ -109,7 +109,7 @@ class camera(Node):
         if self.kill_light is False:
             msg.light = self.light_detection()
         msg.sign = self.sign_identification()
-        self.get_logger().info(str(msg.sign))
+        # self.get_logger().info(str(msg.sign))
 
         self.publisher_.publish(msg)
 
@@ -205,7 +205,7 @@ class camera(Node):
         # cv2.imshow("IMG_red", red_mask)
         # cv2.imshow("IMG_green", green_mask)
         # cv2.waitKey(1)
-
+        self.get_logger().info(status)
         return status
 
     # Use following function to create dataset of raw images
@@ -286,7 +286,7 @@ class camera(Node):
         for i in high_conf_indices:
             x1, y1, x2, y2 = map(int, xyxy[i])
             # filter signs that are too small/too far away
-            if abs(y1 - y2) < 45:
+            if abs(y1 - y2) < 40:
                 # self.get_logger().info("Sign was too small")
                 del high_conf_indices[i]
             label = f"{class_names[class_ids[i]]}: {results[0].boxes.conf.cpu().numpy()[i]:.2f}"

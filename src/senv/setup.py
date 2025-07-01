@@ -13,6 +13,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml', 'launch/launch_senv_lane.py']),
         ('share/' + package_name, ['package.xml', 'launch/launch_senv.py']),
+        ('share/' + package_name, ['package.xml', 'launch/launch_senv_park.py']),
         # Add launch files
         # (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
     ],

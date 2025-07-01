@@ -6,3 +6,4 @@ float64 back_distance
 float64 back_right_distance
 float64 right_distance 
 float64 front_right_distance
+float64[] raw

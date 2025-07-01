@@ -1,148 +1,137 @@
 import rclpy
 from rclpy.node import Node
-from rclpy.action import ActionServer
-from geometry_msgs.msg import Twist
+from rclpy.action import ActionServer, CancelResponse
 from rclpy.action.server import ServerGoalHandle
-from senv_interfaces.msg import Pic, Laser
+from senv_interfaces.msg import Pic, Laser, Move
 from senv_interfaces.action import ConTask
-from std_msgs.msg import String
-from senv.description import float_desc, int_desc, light_int_desc, bool_desc
+from rclpy.executors import MultiThreadedExecutor
+from rclpy.callback_groups import ReentrantCallbackGroup
+from sensor_msgs.msg import CompressedImage
+from cv_bridge import CvBridge
+import cv2
 
 
-class obstacle_con(Node):
+class Obstacle_con(Node):
     def __init__(self):
         super().__init__('obstacle_con')
-        self.get_logger().info("obstacle_con node started")
+        self.get_logger().info('obstacle_con node has been started.')
+
         # Parameters
-        self.declare_parameter('distance_to_obstacle', 0.6, float_desc(
-            "Gewünschter Abstand zum Objekt"))
-
-        self.turned_on = False
-        self.state_obstacle = "Unknown"
+        self.obstacle_state = 0
         self.right_distance = 0.0
-
+        self.front_distance = 0.0
+        self.turned_on = True
+        self.right_range = []
+        self.raw = []
+        self.right_closest = 0.0
         # QOS Policy Setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
 
-        # Subscriptions
-        self.subscriber_pic = self.create_subscription(
-            Pic, 'pic', self.pic_callback, qos_profile=qos_policy
-            )
         self.subscriber_laser = self.create_subscription(
-            Laser, 'laser', self.laser_callback, qos_profile=qos_policy
-            )
+            Laser,
+            'laser',
+            self.laser_callback,
+            qos_profile=qos_policy
+        )
+        self.subscriber_laser  # prevent unused variable warning
 
-        # Publishers
-        self.publisher_driver = self.create_publisher(Twist, 'driving', qos_profile=qos_policy)
-        self.publisher_state = self.create_publisher(String, 'state', qos_profile=qos_policy)
+        self.obstacle_task_server_ = ActionServer(
+            self,
+            ConTask,
+            "obstacle_task",
+            execute_callback=self.execute_callback,
+            callback_groups=ReentrantCallbackGroup(),
+        )
 
-        # Action Server
-        self.obstacle_task_server = ActionServer(
-            self, ConTask, "obstacle_task", self.execute_callback
-            )
+        self.publisher_driver = self.create_publisher(Move, "drive", 1)
 
-    def execute_callback(self, goal_handle):
+    def execute_callback(self, goal_handle: ServerGoalHandle):
+
+        # Get request from goal
         target = goal_handle.request.start_working
+        info = goal_handle.request.info
+        self.get_logger().info("Starting obstacle server")
+
+        # Turn on flag
         self.turned_on = target
-        self.datahandler()
+
+        # Start main logic via a timer to avoid blocking
+        self.main_timer = self.create_timer(0.1, lambda: self.datahandler(info))
+
+        # Wait for process to finish
+        while self.turned_on is True:
+            rclpy.spin_once(self, timeout_sec=0.1)
+
+        self.get_logger().info("Obstacle handling finished, turning off")
+        # Stop the timer when finished
+        # self.main_timer.cancel()
+
+        # Final Goal State
         goal_handle.succeed()
         result = ConTask.Result()
         result.finished = True
         return result
 
-    def pic_callback(self, msg):
-        if not self.turned_on:
-            return
-
-    def laser_callback(self, msg: Laser):
-        if not self.turned_on:
-            return
-
-        self.right_distance = msg.right_distance
-        if self.right_distance == "inf":
-            self.right_distance = 0.0
-        if msg.front_distance <= 0.5 and msg.front_distance != 0:
-            self.state_obstacle = "Infront"
-
-        self.get_logger().info(f"right distance: {self.right_distance}")
-
-    def datahandler(self):
-        if self.state_obstacle == "Infront":
-            self.turn90(1.0, 3)
-            self.drive_length(2)
-            self.turn90(-1.0, 3)
-            self.drive_length(0)
-            while self.right_distance > 0.6:
-                self.get_logger().info("waiting till obstacle is right of me")
-                self.wait_ros2(0.1)
-
-            while self.right_distance < 0.6:
-                self.drive_along()
-                self.get_logger().info("Driving along obstacle")
-                self.wait_ros2(0.1)
-
-            self.drive_length(0.3)
-            self.turn90(-1.0, 3)
-            if self.right_distance > 0.8:
-                self.drive_length(0.2)
-            while self.right_distance > 0.8:
-                # self.get_logger().info("waiting till obstacle is right of me")
-                self.wait_ros2(0)
-
-            self.turn90(1.0, 3)
-            self.get_logger().info("Obstacle avoidance finished")
-
-    def turn90(self, direction, duration):
-        msg = Twist()
-        msg.linear.x = 0.0
-        msg.angular.z = 0.5 * direction
-        self.publisher_driver.publish(msg)
-
-        # ROS 2-kompatibles Warten
-        self.wait_ros2(duration)
-
-        msg.angular.z = 0.0
-        self.publisher_driver.publish(msg)
-        self.get_logger().info("Turned 90 degrees")
-
-    def drive_length(self, duration):
-        msg = Twist()
-
-        msg.linear.x = 0.175
-        msg.angular.z = 0.0
-        self.publisher_driver.publish(msg)
-        self.wait_ros2(duration)
-
-        # ROS 2-kompatibles Warten
-
-        # msg.linear.x = 0.0
-        # self.publisher_driver.publish(msg)
-        self.get_logger().info("Drove length")
-
-    def drive_along(self):
-        distance_to_obstacle = self.get_parameter(
-            'distance_to_obstacle').get_parameter_value().double_value
-        msg = Twist()
-        msg.linear.x = 0.1
-
-        if self.right_distance < distance_to_obstacle:
-            msg.angular.z = 0.25
+    def cancel_callback(self):
+        if self.turned_on is True:
+            return CancelResponse.REJECT
         else:
-            msg.angular.z = - 0.25
+            return CancelResponse.ACCEPT
 
-        self.publisher_driver.publish(msg)
+    def laser_callback(self, msg):
+        if self.turned_on is False:
+            return
+        self.raw = msg.raw
+        self.right_range = self.raw[540:719]
+        if len(self.right_range) == 0:
+            self.right_range = [0.0]
+        self.right_closest = min(self.right_range)
+        self.front_distance = msg.front_distance
 
-    def back_turn90(self):
-        msg = Twist()
-        while self.right_distance < 0.8:
-            msg.linear.x = 0.0
-            msg.angular.z = 0.2
+    def datahandler(self, info):
+        self.get_logger().info("shortest obstacle" + str(self.right_closest))
+        if self.obstacle_state == 0:
+            if self.front_distance < 0.4:
+                self.obstacle_state = 1
+                self.get_logger().info("Obstacle detected in front, changing state to 1")
+            else:
+                self.wait_ros2(1)
+                if self.right_distance < 0.4:
+                    self.obstacle_state = 1
+                else:
+                    self.get_logger().info("No obstacle detected, waiting for next scan")
+                    return
+        elif self.obstacle_state == 1:
+            self.get_logger().info("Turn 90 degress to the left")
+            self.turn90(1.0)
+            self.obstacle_state = 2
+        elif self.obstacle_state == 2:
+            self.get_logger().info("Driving along obstacle")
+            self.drive_length(1.3)
+            self.obstacle_state = 3
+        elif self.obstacle_state == 3:
+            self.get_logger().info("Turning 90 degrees to the right")
+            self.turn90(-1.0)
+            self.obstacle_state = 4
+        elif self.obstacle_state == 4:
+            self.drive_timer = self.create_timer(0.1, self.drive_along_obstacle)
+        elif self.obstacle_state == 5:
+            self.turn90(-1.0)
+            self.obstacle_state = 6
+        elif self.obstacle_state == 6:
+            self.drive_length(1.3)
+            self.obstacle_state = 7
+        elif self.obstacle_state == 7:
+            self.turn90(1.0)
+            self.get_logger().info("Obstacle handling finished, turning off")
+            msg = Move()
+            msg.follow = True
+            msg.speed = 0.7
+            msg.turn = 0
             self.publisher_driver.publish(msg)
-
-        msg.angular.z = 0.0
-        self.publisher_driver.publish(msg)
-        self.get_logger().info("Back turn 90 degrees")
+            self.turned_on = False
+            self.main_timer.cancel()  # Stop the main timer
 
     def wait_ros2(self, duration):
         """ROS 2-kompatibles Warten, ohne Callbacks zu blockieren."""
@@ -150,19 +139,57 @@ class obstacle_con(Node):
         while (self.get_clock().now().nanoseconds - start_time) / 1e9 < duration:
             rclpy.spin_once(self, timeout_sec=0.1)
 
+    def turn90(self, direction):
+        msg = Move()
+        msg.follow = False
+        msg.speed = 1.0
+        msg.override = True
+        msg.speed_o = 0.0
+        msg.turn_o = 0.5 * direction
+        self.publisher_driver.publish(msg)
+        self.wait_ros2(3)
+        msg.turn_o = 0.0
+        self.publisher_driver.publish(msg)
+
+    def drive_length(self, duration):
+        msg = Move()
+        msg.follow = False
+        msg.override = True
+        msg.speed = 1.0
+        msg.speed_o = 0.2
+        msg.turn_o = 0.0
+        self.publisher_driver.publish(msg)
+        self.wait_ros2(duration)
+        msg.speed_o = 0.0
+        self.publisher_driver.publish(msg)
+
+    def drive_along_obstacle(self):
+        msg = Move()
+        msg.follow = True
+        msg.turn = 0
+        if self.right_closest < 0.6:
+            msg.speed = 0.7
+            self.publisher_driver.publish(msg)
+            # self.get_logger().info("distance: " + str(self.right_closest))
+        else:
+            msg.speed = 0.0
+            self.publisher_driver.publish(msg)
+            self.get_logger().info("Finished driving along obstacle")
+            self.drive_timer.cancel()  # Stop the timer
+            self.obstacle_state = 5    # Continue with your state machine
+
 
 def main(args=None):
     rclpy.init(args=args)
-    node = obstacle_con()
+    obstacle_con = Obstacle_con()
+    executor = MultiThreadedExecutor()
     try:
-        rclpy.spin(node)
-
+        rclpy.spin(obstacle_con, executor=executor)
     except KeyboardInterrupt:
-        node.destroy_node()
-
+        obstacle_con.destroy_node()
     finally:
-        node.destroy_node()
-        print('Shutting Down Obstacle_con')
+        obstacle_con.destroy_node()
+        print('Shutting Down obstacle_con')
 
 
 if __name__ == '__main__':
