@@ -22,7 +22,7 @@ class laserscanner(rclpy.node.Node):
         self.right_distance = 0.0
         self.front_right_distance = 0.0
         self.raw = []
-
+        
         # definition of the parameters that can be changed at runtime
         self.declare_parameter('distance_to_turn', 0.45)
         self.declare_parameter('speed_drive', 0.15)
@@ -75,18 +75,25 @@ class laserscanner(rclpy.node.Node):
             self.front_angle = rounded[630:720].index(min_front)
         # self.front_angle = rounded[0:90].index(min_front) or rounded[630:720].index(min_front)
         '''
-        self.front_distance = msg.ranges[0]
-        self.front_left_distance = msg.ranges[90]
-        self.left_distance = msg.ranges[180]
-        self.back_left_distance = msg.ranges[270]
-        self.back_distance = msg.ranges[360]
-        self.back_right_distance = msg.ranges[450]
-        self.right_distance = msg.ranges[540]
-        self.front_right_distance = msg.ranges[630]
-        self.raw = array.array('d', msg.ranges)
-        # saving the required sensor value, no further processing at this point
-        self.front_distance = msg.ranges[self.get_parameter('laser_front')
-                                         .get_parameter_value().integer_value]
+
+        if msg is not None:
+            # self.get_logger().info("Laserscan exists")
+            self.front_distance = msg.ranges[0]
+            self.front_left_distance = msg.ranges[90]
+            self.left_distance = msg.ranges[180]
+            self.back_left_distance = msg.ranges[270]
+            self.back_distance = msg.ranges[360]
+            self.back_right_distance = msg.ranges[450]
+            self.right_distance = msg.ranges[540]
+            self.front_right_distance = msg.ranges[630]
+            self.raw = array.array('d', msg.ranges)
+            # saving the required sensor value, no further processing at this point
+            self.front_distance = msg.ranges[self.get_parameter('laser_front')
+                                             .get_parameter_value().integer_value]
+            # self.get_logger().info(f"Right Distance: {self.right_distance}")
+            # self.get_logger().info(f"Far Left: {msg.ranges[580]}, Right: {msg.ranges[500]} ")
+            # self.get_logger().info(f"Middle Left: {msg.ranges[594]}, Right: {msg.ranges[468]} ")
+            # self.get_logger().info(f"Close Left: {msg.ranges[604]}, Right: {msg.ranges[444]} ")
 
     # driving logics
     def timer_callback(self):
@@ -103,7 +110,6 @@ class laserscanner(rclpy.node.Node):
         msg.front_right_distance = self.front_right_distance
         msg.raw = self.raw
         self.publisher_laserturn.publish(msg)
-        #  self.get_logger().info("laserscanner : " + str(msg.raw))
 
 
 def main(args=None):

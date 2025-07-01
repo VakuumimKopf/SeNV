@@ -11,7 +11,7 @@ from senv.description import light_int_desc, int_desc
 from ultralytics import YOLO
 
 # load model
-model = YOLO("/home/hans/ros2_ws/src/SeNV/src/senv/senv/best3.0.pt")
+model = YOLO("/home/nlaaser/ros2_ws/src/senv/src/senv/senv/best3.0.pt")
 
 
 class camera(Node):
@@ -109,7 +109,7 @@ class camera(Node):
         if self.kill_light is False:
             msg.light = self.light_detection()
         msg.sign = self.sign_identification()
-        self.get_logger().info(str(msg.sign))
+        # self.get_logger().info(str(msg.sign))
 
         self.publisher_.publish(msg)
 
@@ -286,7 +286,7 @@ class camera(Node):
         for i in high_conf_indices:
             x1, y1, x2, y2 = map(int, xyxy[i])
             # filter signs that are too small/too far away
-            if abs(y1 - y2) < 45:
+            if abs(y1 - y2) < 40:
                 # self.get_logger().info("Sign was too small")
                 del high_conf_indices[i]
             label = f"{class_names[class_ids[i]]}: {results[0].boxes.conf.cpu().numpy()[i]:.2f}"
