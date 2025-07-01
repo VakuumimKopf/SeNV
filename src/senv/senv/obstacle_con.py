@@ -41,7 +41,7 @@ class Obstacle_con(Node):
             ConTask,
             "obstacle_task",
             execute_callback=self.execute_callback,
-            callback_groups=ReentrantCallbackGroup(),
+            callback_group=ReentrantCallbackGroup(),
         )
 
         self.publisher_driver = self.create_publisher(Move, "drive", 1)
