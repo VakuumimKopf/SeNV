@@ -77,7 +77,7 @@ class camera(Node):
 
         #  Converting raw data into np.array
 
-        img_cv = self.bridge.compressed_imgmsg_to_cv2(data, desired_encoding='passthrough')
+        img_cv = cv2.blur(self.bridge.compressed_imgmsg_to_cv2(data, desired_encoding='passthrough'), (5, 5))
 
         # just the image for later use (in sign_identification)
         self.raw_image = img_cv
@@ -87,7 +87,7 @@ class camera(Node):
 
         # Speichere HSV für farbanalyse in sign detection
         # Bereich: rechtes Drittel, mittleres Drittel vertikal
-        x_start = width * 2 // 3
+        x_start = width // 2
         x_end = width
         y_start = height // 4
         y_end = height // 2
@@ -205,7 +205,7 @@ class camera(Node):
         # cv2.imshow("IMG_red", red_mask)
         # cv2.imshow("IMG_green", green_mask)
         # cv2.waitKey(1)
-
+        self.get_logger().info(status)
         return status
 
     # Use following function to create dataset of raw images
