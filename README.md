@@ -45,3 +45,9 @@ https://www.planttext.com?text=RL9HQiCm33s1xo3ojNraHnXbx0JRPoX3IPJKr963ehIKqhjFJ
 
 - **Störungen ignorieren**: Das Fahrzeug filtert anhand von Linienposition, Liniendicke und Linienkrümmung (Eher Anstieg) Störungen von Fahrlinien
 - **Fehlende Linien**: Das Fahrzeug hält seine Fahrt auch, wenn die Fahrlinien fehlen sollten bis es wieder Fahrlinien findet
+
+### Aufgabe 6 : Fußgängerüberweg 
+
+- **Füßgängerüberwegsschild erkennen**: Gleiches Prinzip wie bei der Parkschild-Erkennung. Hier wird die Position des Schildes nicht mittels Laserscanner überprüft, sondern geschaut, ob das Schild noch im Bild der Kamera zu sehen ist.
+- **Fußgänger erkennen**: Hierfür wurde ein zweites Yolov8 Model mit Bilder des Fußgängers trainiert.
+- **Überqueren des Fußgängerüberweges**: Das Objekterkennungsmodel gibt während der Erkennung die X-Werte des erkannten Menschen aus. Zur ersten Erkennung wird ein Startwert festgelegt und dann während des Wartens die Differenz des akutellen X-Wertes zum Startwert berechnet. Wenn diese einen bestimmten Schwellenwert erreicht, wurde der Fußgängerüberweg erfolgreich überquert. 
