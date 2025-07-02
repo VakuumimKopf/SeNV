@@ -73,8 +73,13 @@ class Intersection_con(Node):
         elif info == "straight":
             while self.turned_on is True:
                 self.datahandler_straight()
+                self.wait_ros2(0.3)
+
         else:
             self.get_logger().info("Unknown Info in intersection_con...hand back")
+
+        self.counter_voting = 0
+        self.get_logger().info("Hand back")
 
         # Final Goal State
         goal_handle.succeed()
@@ -82,7 +87,6 @@ class Intersection_con(Node):
         # Result
         result = ConTask.Result()
         result.finished = True
-        self.counter_voting = 0
         return result
 
     def cancel_callback(self, goal_handle):
@@ -114,10 +118,10 @@ class Intersection_con(Node):
             msg.override = True
             msg.speed = 1.0
             msg.speed_o = 0.10
-            msg.turn_o = 0.17
+            msg.turn_o = 0.21
             self.publisher_driver.publish(msg)
 
-            self.wait_ros2(5.0)
+            self.wait_ros2(8.5)
 
             self.get_logger().info("Finished")
 
@@ -153,10 +157,10 @@ class Intersection_con(Node):
             msg.override = True
             msg.speed = 1.0
             msg.speed_o = 0.05
-            msg.turn_o = -0.17
+            msg.turn_o = -0.21
             self.publisher_driver.publish(msg)
 
-            self.wait_ros2(5.0)
+            self.wait_ros2(8.0)
 
             self.get_logger().info("Finished")
 
@@ -180,7 +184,7 @@ class Intersection_con(Node):
             self.counter_voting = self.counter_voting + 1
 
     def datahandler_straight(self):
-        
+
         if self.last_pic_msg is None:
             return
 
@@ -191,11 +195,11 @@ class Intersection_con(Node):
             msg.follow = False
             msg.override = True
             msg.speed = 1.0
-            msg.speed_o = 0.17
+            msg.speed_o = 0.15
             msg.turn_o = 0.0
             self.publisher_driver.publish(msg)
 
-            self.wait_ros2(5.0)
+            self.wait_ros2(7.0)
 
             self.get_logger().info("Finished")
 

@@ -9,7 +9,6 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge
 from ultralytics import YOLO
-import cv2
 
 
 class Crosswalk_con(Node):
@@ -23,7 +22,7 @@ class Crosswalk_con(Node):
         self.bridge = CvBridge()
         self.raw_image = None
 
-        self.model = YOLO("/home/nlaaser/ros2_ws/src/senv/src/senv/senv/best3.0.pt")
+        self.model = YOLO("/home/oliver/senv_ws/src/senv/senv/human.pt")
 
         self.middle_x = 0.0
         self.crossed = False

@@ -20,7 +20,7 @@ class Obstacle_con(Node):
         self.obstacle_state = 0
         self.right_distance = 0.0
         self.front_distance = 0.0
-        self.turned_on = True
+        self.turned_on = False
         self.right_range = []
         self.raw = []
         self.right_closest = 0.0
@@ -41,7 +41,8 @@ class Obstacle_con(Node):
             ConTask,
             "obstacle_task",
             execute_callback=self.execute_callback,
-            callback_groups=ReentrantCallbackGroup(),
+            cancel_callback=self.cancel_callback,
+            callback_group=ReentrantCallbackGroup(),
         )
 
         self.publisher_driver = self.create_publisher(Move, "drive", 1)
@@ -50,22 +51,26 @@ class Obstacle_con(Node):
 
         # Get request from goal
         target = goal_handle.request.start_working
-        info = goal_handle.request.info
+        # info = goal_handle.request.info
         self.get_logger().info("Starting obstacle server")
 
         # Turn on flag
         self.turned_on = target
 
         # Start main logic via a timer to avoid blocking
-        self.main_timer = self.create_timer(0.1, lambda: self.datahandler(info))
+        # self.main_timer = self.create_timer(0.1, lambda: self.datahandler())
 
         # Wait for process to finish
         while self.turned_on is True:
-            rclpy.spin_once(self, timeout_sec=0.1)
+            # rclpy.spin_once(self, timeout_sec=0.1)
+            self.datahandler()
+            self.wait_ros2(0.4)
 
         self.get_logger().info("Obstacle handling finished, turning off")
         # Stop the timer when finished
         # self.main_timer.cancel()
+
+        self.obstacle_state = 0
 
         # Final Goal State
         goal_handle.succeed()
@@ -89,7 +94,7 @@ class Obstacle_con(Node):
         self.right_closest = min(self.right_range)
         self.front_distance = msg.front_distance
 
-    def datahandler(self, info):
+    def datahandler(self):
         self.get_logger().info("shortest obstacle" + str(self.right_closest))
         if self.obstacle_state == 0:
             if self.front_distance < 0.4:
@@ -115,7 +120,7 @@ class Obstacle_con(Node):
             self.turn90(-1.0)
             self.obstacle_state = 4
         elif self.obstacle_state == 4:
-            self.drive_timer = self.create_timer(0.1, self.drive_along_obstacle)
+            self.drive_along_obstacle()
         elif self.obstacle_state == 5:
             self.turn90(-1.0)
             self.obstacle_state = 6
@@ -124,14 +129,13 @@ class Obstacle_con(Node):
             self.obstacle_state = 7
         elif self.obstacle_state == 7:
             self.turn90(1.0)
-            self.get_logger().info("Obstacle handling finished, turning off")
             msg = Move()
             msg.follow = True
             msg.speed = 0.7
             msg.turn = 0
             self.publisher_driver.publish(msg)
             self.turned_on = False
-            self.main_timer.cancel()  # Stop the main timer
+            # self.main_timer.cancel()  # Stop the main timer
 
     def wait_ros2(self, duration):
         """ROS 2-kompatibles Warten, ohne Callbacks zu blockieren."""
@@ -175,7 +179,6 @@ class Obstacle_con(Node):
             msg.speed = 0.0
             self.publisher_driver.publish(msg)
             self.get_logger().info("Finished driving along obstacle")
-            self.drive_timer.cancel()  # Stop the timer
             self.obstacle_state = 5    # Continue with your state machine
 
 
