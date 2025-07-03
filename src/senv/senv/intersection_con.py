@@ -6,6 +6,7 @@ from senv_interfaces.msg import Pic, Laser, Move
 from senv_interfaces.action import ConTask
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
+import time
 
 
 class Intersection_con(Node):
@@ -112,12 +113,12 @@ class Intersection_con(Node):
 
         self.get_logger().info("Votes" + str(self.counter_voting))
 
-        if self.counter_voting == 3:
+        if self.counter_voting == 4:
             msg = Move()
             msg.follow = False
             msg.override = True
             msg.speed = 1.0
-            msg.speed_o = 0.10
+            msg.speed_o = 0.11
             msg.turn_o = 0.21
             self.publisher_driver.publish(msg)
 
@@ -151,7 +152,7 @@ class Intersection_con(Node):
 
         self.get_logger().info("Votes" + str(self.counter_voting))
 
-        if self.counter_voting == 3:
+        if self.counter_voting == 4:
             msg = Move()
             msg.follow = False
             msg.override = True
@@ -190,7 +191,7 @@ class Intersection_con(Node):
 
         self.get_logger().info("Votes" + str(self.counter_voting))
 
-        if self.counter_voting == 3:
+        if self.counter_voting == 4:
             msg = Move()
             msg.follow = False
             msg.override = True
@@ -222,12 +223,11 @@ class Intersection_con(Node):
         else:
             self.counter_voting = self.counter_voting + 1
 
-    def wait_ros2(self, duration):
-        """ROS 2-kompatibles Warten, ohne Callbacks zu blockieren."""
-        start_time = self.get_clock().now().nanoseconds
-        while (self.get_clock().now().nanoseconds - start_time) / 1e9 < duration:
-            rclpy.spin_once(self, timeout_sec=0.1)
-
+    def wait_ros2(self, duration: float):
+        i = duration * 100
+        while i > 0:
+            time.sleep(0.01)
+            i -= 1
 
 def main(args=None):
     rclpy.init(args=args)

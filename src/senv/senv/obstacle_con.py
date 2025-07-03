@@ -9,6 +9,8 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge
 import cv2
+import asyncio
+import time
 
 
 class Obstacle_con(Node):
@@ -97,7 +99,7 @@ class Obstacle_con(Node):
     def datahandler(self):
         self.get_logger().info("shortest obstacle" + str(self.right_closest))
         if self.obstacle_state == 0:
-            if self.front_distance < 0.4:
+            if self.front_distance < 0.3:
                 self.obstacle_state = 1
                 self.get_logger().info("Obstacle detected in front, changing state to 1")
             else:
@@ -122,6 +124,7 @@ class Obstacle_con(Node):
         elif self.obstacle_state == 4:
             self.drive_along_obstacle()
         elif self.obstacle_state == 5:
+            self.follow_length(0.5)
             self.turn90(-1.0)
             self.obstacle_state = 6
         elif self.obstacle_state == 6:
@@ -137,11 +140,11 @@ class Obstacle_con(Node):
             self.turned_on = False
             # self.main_timer.cancel()  # Stop the main timer
 
-    def wait_ros2(self, duration):
-        """ROS 2-kompatibles Warten, ohne Callbacks zu blockieren."""
-        start_time = self.get_clock().now().nanoseconds
-        while (self.get_clock().now().nanoseconds - start_time) / 1e9 < duration:
-            rclpy.spin_once(self, timeout_sec=0.1)
+    def wait_ros2(self, duration: float):
+        i = duration * 100
+        while i > 0:
+            time.sleep(0.01)
+            i -= 1
 
     def turn90(self, direction):
         msg = Move()
@@ -167,11 +170,21 @@ class Obstacle_con(Node):
         msg.speed_o = 0.0
         self.publisher_driver.publish(msg)
 
+    def follow_length(self, duration):
+        msg = Move()
+        msg.follow = True
+        msg.override = False
+        msg.speed = 0.5
+        self.publisher_driver.publish(msg)
+        self.wait_ros2(duration)
+        msg.speed_o = 0.0
+        self.publisher_driver.publish(msg)
+
     def drive_along_obstacle(self):
         msg = Move()
         msg.follow = True
         msg.turn = 0
-        if self.right_closest < 0.6:
+        if self.right_closest < 0.5:
             msg.speed = 0.7
             self.publisher_driver.publish(msg)
             # self.get_logger().info("distance: " + str(self.right_closest))
