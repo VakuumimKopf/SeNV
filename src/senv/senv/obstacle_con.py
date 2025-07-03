@@ -2,14 +2,10 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer, CancelResponse
 from rclpy.action.server import ServerGoalHandle
-from senv_interfaces.msg import Pic, Laser, Move
+from senv_interfaces.msg import Laser, Move
 from senv_interfaces.action import ConTask
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
-from sensor_msgs.msg import CompressedImage
-from cv_bridge import CvBridge
-import cv2
-import asyncio
 import time
 
 
@@ -22,6 +18,7 @@ class Obstacle_con(Node):
         self.obstacle_state = 0
         self.right_distance = 0.0
         self.front_distance = 0.0
+        self.front_right_distance = 0.0
         self.turned_on = False
         self.right_range = []
         self.raw = []
@@ -59,9 +56,6 @@ class Obstacle_con(Node):
         # Turn on flag
         self.turned_on = target
 
-        # Start main logic via a timer to avoid blocking
-        # self.main_timer = self.create_timer(0.1, lambda: self.datahandler())
-
         # Wait for process to finish
         while self.turned_on is True:
             # rclpy.spin_once(self, timeout_sec=0.1)
@@ -69,8 +63,6 @@ class Obstacle_con(Node):
             self.wait_ros2(0.4)
 
         self.get_logger().info("Obstacle handling finished, turning off")
-        # Stop the timer when finished
-        # self.main_timer.cancel()
 
         self.obstacle_state = 0
 
@@ -90,55 +82,47 @@ class Obstacle_con(Node):
         if self.turned_on is False:
             return
         self.raw = msg.raw
+        self.front_distance = msg.front_distance
+        self.front_right_distance = msg.front_right_distance
         self.right_range = self.raw[540:719]
         if len(self.right_range) == 0:
             self.right_range = [0.0]
-        self.right_closest = min(self.right_range)
-        self.front_distance = msg.front_distance
+        self.right_closest = min(min(self.right_range), self.front_distance)
 
     def datahandler(self):
-        self.get_logger().info("shortest obstacle" + str(self.right_closest))
         if self.obstacle_state == 0:
-            if self.front_distance < 0.3:
+            if self.right_closest < 0.3:
                 self.obstacle_state = 1
-                self.get_logger().info("Obstacle detected in front, changing state to 1")
+                # self.get_logger().info("Obstacle detected in front, changing state to 1")
             else:
                 self.wait_ros2(1)
-                if self.right_distance < 0.4:
+                if self.right_closest < 0.3:
                     self.obstacle_state = 1
                 else:
-                    self.get_logger().info("No obstacle detected, waiting for next scan")
-                    return
+                    self.obstacle_state = 4
         elif self.obstacle_state == 1:
-            self.get_logger().info("Turn 90 degress to the left")
             self.turn90(1.0)
+            self.drive_length(1.3)
+            self.turn90(-1.0)
+            self.drive_length(1.2)
             self.obstacle_state = 2
         elif self.obstacle_state == 2:
-            self.get_logger().info("Driving along obstacle")
-            self.drive_length(1.3)
-            self.obstacle_state = 3
-        elif self.obstacle_state == 3:
-            self.get_logger().info("Turning 90 degrees to the right")
-            self.turn90(-1.0)
-            self.obstacle_state = 4
-        elif self.obstacle_state == 4:
+            # self.get_logger().info("Driving along obstac le")
             self.drive_along_obstacle()
-        elif self.obstacle_state == 5:
+            self.get_logger().info("Obstacle state 2, driving along obstacle")
+        elif self.obstacle_state == 3:
             self.follow_length(0.5)
             self.turn90(-1.0)
-            self.obstacle_state = 6
-        elif self.obstacle_state == 6:
             self.drive_length(1.3)
-            self.obstacle_state = 7
-        elif self.obstacle_state == 7:
             self.turn90(1.0)
+            self.obstacle_state = 4
+        elif self.obstacle_state == 4:
             msg = Move()
             msg.follow = True
             msg.speed = 0.7
             msg.turn = 0
             self.publisher_driver.publish(msg)
             self.turned_on = False
-            # self.main_timer.cancel()  # Stop the main timer
 
     def wait_ros2(self, duration: float):
         i = duration * 100
@@ -184,15 +168,19 @@ class Obstacle_con(Node):
         msg = Move()
         msg.follow = True
         msg.turn = 0
-        if self.right_closest < 0.5:
+        if self.right_closest < 0.37:
             msg.speed = 0.7
             self.publisher_driver.publish(msg)
-            # self.get_logger().info("distance: " + str(self.right_closest))
+            self.get_logger().info("right distance: " + str(self.right_closest))
         else:
+            self.wait_ros2(0.5)
+            if self.right_closest < 0.37:
+                msg.speed = 0.7
+                self.publisher_driver.publish(msg)
             msg.speed = 0.0
             self.publisher_driver.publish(msg)
-            self.get_logger().info("Finished driving along obstacle")
-            self.obstacle_state = 5    # Continue with your state machine
+            # self.get_logger().info("Finished driving along obstacle")
+            self.obstacle_state = 3    # Continue with your state machine
 
 
 def main(args=None):

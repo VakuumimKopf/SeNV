@@ -1,11 +1,8 @@
 import rclpy
 import rclpy.node
 import numpy as np
-from senv.stopper import Stopper
-from std_msgs.msg import String
 from sensor_msgs.msg import LaserScan
 from senv_interfaces.msg import Laser
-from senv.description import float_desc, int_desc, bool_desc, light_int_desc
 import array
 
 
@@ -22,13 +19,6 @@ class laserscanner(rclpy.node.Node):
         self.right_distance = 0.0
         self.front_right_distance = 0.0
         self.raw = []
-        
-        # definition of the parameters that can be changed at runtime
-        self.declare_parameter('distance_to_turn', 0.45)
-        self.declare_parameter('speed_drive', 0.15)
-        self.declare_parameter('speed_turn', 0.5)
-        self.declare_parameter('laser_front', 0)
-        self.declare_parameter('turn_time', 2.0)
 
         # must ideally equal to an integer when divided by timer_period
         self.img_row = np.random.randint(0, 256, 640, dtype=np.uint8)
@@ -55,26 +45,6 @@ class laserscanner(rclpy.node.Node):
 
     # handling received laser scan data
     def scanner_callback(self, msg):
-        # self.get_logger().info("laserscanner callback" + str(len(msg.ranges)))
-        # min_back = 0.0
-        # min_front = 0.0
-        '''
-        rounded = [round(x, 3) for x in msg.ranges]
-        # self.get_logger().info("laserscanner callback" + str(rounded))
-
-        self.left_distance = min(rounded[170:190])
-        self.right_distance = min(rounded[535:545])
-        min_back = min(rounded[270:450])
-        self.back_distance = min_back
-        self.back_angle = rounded[270:450].index(min_back)
-        min_front = min(min(rounded[0:90]), min(rounded[630:720]))
-        self.front_distance = min_front
-        if min_front == min(rounded[0:90]):
-            self.front_angle = rounded[0:90].index(min_front)
-        else:
-            self.front_angle = rounded[630:720].index(min_front)
-        # self.front_angle = rounded[0:90].index(min_front) or rounded[630:720].index(min_front)
-        '''
 
         if msg is not None:
             # self.get_logger().info("Laserscan exists")
@@ -87,9 +57,10 @@ class laserscanner(rclpy.node.Node):
             self.right_distance = msg.ranges[540]
             self.front_right_distance = msg.ranges[630]
             self.raw = array.array('d', msg.ranges)
+            # Find the index of the smallest value in the range 540:719
             # saving the required sensor value, no further processing at this point
-            self.front_distance = msg.ranges[self.get_parameter('laser_front')
-                                             .get_parameter_value().integer_value]
+            # self.front_distance = msg.ranges[self.get_parameter('laser_front')
+            #                                 .get_parameter_value().integer_value]
             # self.get_logger().info(f"Right Distance: {self.right_distance}")
             # self.get_logger().info(f"Far Left: {msg.ranges[580]}, Right: {msg.ranges[500]} ")
             # self.get_logger().info(f"Middle Left: {msg.ranges[594]}, Right: {msg.ranges[468]} ")
@@ -98,7 +69,6 @@ class laserscanner(rclpy.node.Node):
     # driving logics
     def timer_callback(self):
         # self.get_logger().info("laserscannercallback")
-
         msg = Laser()
         msg.front_distance = self.front_distance
         msg.front_left_distance = self.front_left_distance
