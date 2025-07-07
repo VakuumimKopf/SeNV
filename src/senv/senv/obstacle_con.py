@@ -23,6 +23,7 @@ class Obstacle_con(Node):
         self.right_range = []
         self.raw = []
         self.right_closest = 0.0
+        self.right_check = 0.0
         # QOS Policy Setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
@@ -84,34 +85,56 @@ class Obstacle_con(Node):
         self.raw = msg.raw
         self.front_distance = msg.front_distance
         self.front_right_distance = msg.front_right_distance
+        self.right_check = self.raw[674]
         self.right_range = self.raw[540:719]
         if len(self.right_range) == 0:
             self.right_range = [0.0]
         self.right_closest = min(min(self.right_range), self.front_distance)
 
     def datahandler(self):
+        msg = Move()
+        msg.follow = True
         if self.obstacle_state == 0:
             if self.right_closest < 0.3:
-                self.obstacle_state = 1
-                # self.get_logger().info("Obstacle detected in front, changing state to 1")
-            else:
-                self.wait_ros2(1)
-                if self.right_closest < 0.3:
+                msg.speed = 0.0
+                msg.turn = 0
+                self.publisher_driver.publish(msg)
+                self.wait_ros2(2)
+                self.get_logger().info("index for cloest: " + str(self.right_range.index(self.right_closest)))
+                self.get_logger().info(str(self.right_check))
+                if self.right_check < 0.35 or self.front_distance < 0.35:
                     self.obstacle_state = 1
                 else:
                     self.obstacle_state = 4
+            else:
+                self.wait_ros2(1)
+                if self.right_closest < 0.3:
+                    msg.speed = 0.0
+                    msg.turn = 0
+                    self.publisher_driver.publish(msg)
+                    self.wait_ros2(2)
+                    # self.get_logger().info("index for cloest: " + str(self.right_range.index(self.right_closest)))
+                    self.get_logger().info(str(self.right_check))
+                    if self.right_check < 0.35 or self.front_distance < 0.35:
+                        self.obstacle_state = 1
+                    else:
+                        self.obstacle_state = 4
+                else:
+                    self.obstacle_state = 4
+
         elif self.obstacle_state == 1:
             self.turn90(1.0)
             self.drive_length(1.3)
             self.turn90(-1.0)
-            self.drive_length(1.2)
+            self.follow_length(1.0)
             self.obstacle_state = 2
         elif self.obstacle_state == 2:
             # self.get_logger().info("Driving along obstac le")
             self.drive_along_obstacle()
-            self.get_logger().info("Obstacle state 2, driving along obstacle")
+            # self.follow_length(1.0)
+            # self.get_logger().info("Obstacle state 2, driving along obstacle")
         elif self.obstacle_state == 3:
-            self.follow_length(0.5)
+            # self.follow_length(0.5)
             self.turn90(-1.0)
             self.drive_length(1.3)
             self.turn90(1.0)
@@ -177,8 +200,8 @@ class Obstacle_con(Node):
             if self.right_closest < 0.37:
                 msg.speed = 0.7
                 self.publisher_driver.publish(msg)
-            msg.speed = 0.0
-            self.publisher_driver.publish(msg)
+            # msg.speed = 0.0
+            # self.publisher_driver.publish(msg)
             # self.get_logger().info("Finished driving along obstacle")
             self.obstacle_state = 3    # Continue with your state machine
 

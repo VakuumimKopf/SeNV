@@ -57,18 +57,9 @@ class laserscanner(rclpy.node.Node):
             self.right_distance = msg.ranges[540]
             self.front_right_distance = msg.ranges[630]
             self.raw = array.array('d', msg.ranges)
-            # Find the index of the smallest value in the range 540:719
-            # saving the required sensor value, no further processing at this point
-            # self.front_distance = msg.ranges[self.get_parameter('laser_front')
-            #                                 .get_parameter_value().integer_value]
-            # self.get_logger().info(f"Right Distance: {self.right_distance}")
-            # self.get_logger().info(f"Far Left: {msg.ranges[580]}, Right: {msg.ranges[500]} ")
-            # self.get_logger().info(f"Middle Left: {msg.ranges[594]}, Right: {msg.ranges[468]} ")
-            # self.get_logger().info(f"Close Left: {msg.ranges[604]}, Right: {msg.ranges[444]} ")
 
     # driving logics
     def timer_callback(self):
-        # self.get_logger().info("laserscannercallback")
         msg = Laser()
         msg.front_distance = self.front_distance
         msg.front_left_distance = self.front_left_distance
