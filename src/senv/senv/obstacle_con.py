@@ -24,6 +24,7 @@ class Obstacle_con(Node):
         self.raw = []
         self.right_closest = 0.0
         self.right_check = 0.0
+
         # QOS Policy Setting
         qos_policy = rclpy.qos.QoSProfile(reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT,
                                           history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
@@ -51,7 +52,6 @@ class Obstacle_con(Node):
 
         # Get request from goal
         target = goal_handle.request.start_working
-        # info = goal_handle.request.info
         self.get_logger().info("Starting obstacle server")
 
         # Turn on flag
@@ -59,7 +59,6 @@ class Obstacle_con(Node):
 
         # Wait for process to finish
         while self.turned_on is True:
-            # rclpy.spin_once(self, timeout_sec=0.1)
             self.datahandler()
             self.wait_ros2(0.4)
 
@@ -91,6 +90,7 @@ class Obstacle_con(Node):
             self.right_range = [0.0]
         self.right_closest = min(min(self.right_range), self.front_distance)
 
+    # Handling the data for the obstacle avoidance
     def datahandler(self):
         msg = Move()
         msg.follow = True
@@ -100,8 +100,6 @@ class Obstacle_con(Node):
                 msg.turn = 0
                 self.publisher_driver.publish(msg)
                 self.wait_ros2(2)
-                self.get_logger().info("index for cloest: " + str(self.right_range.index(self.right_closest)))
-                self.get_logger().info(str(self.right_check))
                 if self.right_check < 0.35 or self.front_distance < 0.35:
                     self.obstacle_state = 1
                 else:
@@ -113,8 +111,6 @@ class Obstacle_con(Node):
                     msg.turn = 0
                     self.publisher_driver.publish(msg)
                     self.wait_ros2(2)
-                    # self.get_logger().info("index for cloest: " + str(self.right_range.index(self.right_closest)))
-                    self.get_logger().info(str(self.right_check))
                     if self.right_check < 0.35 or self.front_distance < 0.35:
                         self.obstacle_state = 1
                     else:
@@ -129,12 +125,8 @@ class Obstacle_con(Node):
             self.follow_length(1.0)
             self.obstacle_state = 2
         elif self.obstacle_state == 2:
-            # self.get_logger().info("Driving along obstac le")
             self.drive_along_obstacle()
-            # self.follow_length(1.0)
-            # self.get_logger().info("Obstacle state 2, driving along obstacle")
         elif self.obstacle_state == 3:
-            # self.follow_length(0.5)
             self.turn90(-1.0)
             self.drive_length(1.3)
             self.turn90(1.0)
@@ -147,12 +139,15 @@ class Obstacle_con(Node):
             self.publisher_driver.publish(msg)
             self.turned_on = False
 
+    # Wait for a given duration in seconds
     def wait_ros2(self, duration: float):
         i = duration * 100
         while i > 0:
             time.sleep(0.01)
             i -= 1
 
+    # Turn the robot 90 degrees in a given direction
+    # direction: 1 for left, -1 for right
     def turn90(self, direction):
         msg = Move()
         msg.follow = False
@@ -165,6 +160,7 @@ class Obstacle_con(Node):
         msg.turn_o = 0.0
         self.publisher_driver.publish(msg)
 
+    # Drive the robot for a given duration
     def drive_length(self, duration):
         msg = Move()
         msg.follow = False
@@ -177,6 +173,7 @@ class Obstacle_con(Node):
         msg.speed_o = 0.0
         self.publisher_driver.publish(msg)
 
+    # line holding for a given duration
     def follow_length(self, duration):
         msg = Move()
         msg.follow = True
@@ -187,6 +184,7 @@ class Obstacle_con(Node):
         msg.speed_o = 0.0
         self.publisher_driver.publish(msg)
 
+    # Drive along the obstacle if it is too close
     def drive_along_obstacle(self):
         msg = Move()
         msg.follow = True
@@ -194,15 +192,11 @@ class Obstacle_con(Node):
         if self.right_closest < 0.37:
             msg.speed = 0.7
             self.publisher_driver.publish(msg)
-            self.get_logger().info("right distance: " + str(self.right_closest))
         else:
             self.wait_ros2(0.5)
             if self.right_closest < 0.37:
                 msg.speed = 0.7
                 self.publisher_driver.publish(msg)
-            # msg.speed = 0.0
-            # self.publisher_driver.publish(msg)
-            # self.get_logger().info("Finished driving along obstacle")
             self.obstacle_state = 3    # Continue with your state machine
 
 
