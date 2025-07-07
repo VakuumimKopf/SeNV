@@ -111,7 +111,6 @@ class camera(Node):
         if self.kill_light is False:
             msg.light = self.light_detection()
         msg.sign = self.sign_identification()
-        self.feature_video()
         # self.get_logger().info(str(msg.sign))
 
         self.publisher_.publish(msg)
