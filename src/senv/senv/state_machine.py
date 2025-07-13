@@ -198,7 +198,7 @@ class state_machine(Node):
             self.get_logger().info("Warte auf Grün")
             return
 
-        if last_laser_msg.front_distance <= 0.5 and last_laser_msg.front_distance != 0.0:
+        if (last_laser_msg.front_distance <= 0.35 and last_laser_msg.front_distance != 0.0) or (last_laser_msg.front_right_distance <= 0.5 and last_laser_msg.front_right_distance != 0.0):
 
             new_state = "obstacle"
             info = ""

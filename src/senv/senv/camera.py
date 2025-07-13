@@ -10,8 +10,10 @@ from senv.description import light_int_desc, int_desc
 # Import ultralytics for sign detection with "pip install ultralytics"
 from ultralytics import YOLO
 
+# Import Pytorch for Feature Map Generation
+import torch
 # load model
-model = YOLO("/home/oliver/senv_ws/src/senv/senv/best3.0.pt")
+model = YOLO("src/senv/senv/best3.0.pt")
 
 
 class camera(Node):
@@ -68,7 +70,7 @@ class camera(Node):
         self.publisher_ = self.create_publisher(Pic, 'pic', 1)
 
         # create timers for data handling
-        self.sign_timer_period = 0.25
+        self.sign_timer_period = 0.016
         self.sign_timer = self.create_timer(
             self.sign_timer_period, self.sign_handler)
 
@@ -208,55 +210,6 @@ class camera(Node):
         self.get_logger().info(status)
         return status
 
-    # Use following function to create dataset of raw images
-    """
-    def image_saving(self):
-        # Save the image to a file.
-
-        # Change to directory of your choice
-        # Change the directory and sign as needed
-        # 0 output
-        # directory = "/home/lennart/ros2_ws/src/senv/Images/left"
-        # sign = "left"
-        # 1 output
-        # directory = "/home/lennart/ros2_ws/src/senv/Images/right"
-        # sign = "right"
-        # 2 output
-        # directory = "/home/lennart/ros2_ws/src/senv/Images/straight"
-        # sign = "straight"
-        # 3 output
-        # directory = "/home/lennart/ros2_ws/src/senv/Images/crosswalk"
-        # sign = "crosswalk"
-        # 4 output
-        directory = "/home/lennart/ros2_ws/src/senv/Images/park"
-        sign = "park"
-
-        # Get the current time
-        current_time = self.get_clock().now().to_msg()
-
-        # Format the time as a string
-        time_str = f"{current_time.sec}_{current_time.nanosec}"
-
-        # Create the filename
-        filename = f"image_{sign}_{time_str}.jpg"
-
-        # Convert the image to a format that can be saved
-        img_cv = self.bridge.compressed_imgmsg_to_cv2(self.img, desired_encoding='passthrough')
-        os.chdir(directory)
-        # Save the image
-        cv2.imwrite(filename, img_cv)
-
-        print("After saving image:")
-
-        print(f'Successfully saved {time_str}')
-
-        elapsed_time = time.time() - self.start_time
-        if elapsed_time > 32:
-            self.get_logger().info("32 Sekunden erreicht – Programm wird beendet.")
-            rclpy.shutdown()
-        return ""
-    """
-
     # Predict the class of an image using a pre-trained model
     def sign_identification(self):
 
@@ -287,7 +240,6 @@ class camera(Node):
             x1, y1, x2, y2 = map(int, xyxy[i])
             # filter signs that are too small/too far away
             if abs(y1 - y2) < 40:
-                # self.get_logger().info("Sign was too small")
                 del high_conf_indices[i]
             label = f"{class_names[class_ids[i]]}: {results[0].boxes.conf.cpu().numpy()[i]:.2f}"
 

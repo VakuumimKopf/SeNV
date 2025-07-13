@@ -17,8 +17,8 @@ import math
 
 class Park_con(Node):
     def __init__(self):
-        super().__init__('crosswalk_con')
-        self.get_logger().info('crosswalk_con node has been started.')
+        super().__init__('park_con')
+        self.get_logger().info('park_con node has been started.')
         # Parameters
         self.turned_on = False
         self.last_pic_msg = None
@@ -31,12 +31,13 @@ class Park_con(Node):
         self.front_spot = "empty"
         self.left_spot = "empty"
         self.right_spot = "empty"
+        self.last_spot = "empty"
 
         self.driveby = 0
         self.lane_hold_direction = 1  # or -1
 
-        self.parkingdist = 1.6  # width of the parking space
-        self.parkinglength = 0.285  # length of thd parking space
+        self.parkingdist = 1.62  # width of the parking space
+        self.parkinglength = 0.30  # odom: 0.285  # length of thd parking space
 
         self.scan_area = "far"
         self.scanning = False
@@ -81,7 +82,7 @@ class Park_con(Node):
             qos_profile=qos_policy
         )
 
-        self.crosswalk_task_server_ = ActionServer(
+        self.park_task_server_ = ActionServer(
             self,
             ConTask,
             "park_task",
@@ -97,7 +98,7 @@ class Park_con(Node):
         # Get request from goal
         target = goal_handle.request.start_working
         info = goal_handle.request.info
-        self.get_logger().info("starting crosswalk server")
+        self.get_logger().info("starting park server")
 
         # Turn in action server
         self.turned_on = target
@@ -114,11 +115,16 @@ class Park_con(Node):
         self.front_spot = "empty"
         self.left_spot = "empty"
         self.right_spot = "empty"
+        self.last_spot = "empty"
         self.driveby = 0
         self.scan_area = ""
         self.scanning = False
         self.get_logger().info("Hand back")
-
+        msg = Move()
+        msg.follow = True
+        msg.speed = 0.5
+        self.followmsg = msg
+        self.turned_on = False
         # Final Goal State
         goal_handle.succeed()
 
@@ -158,10 +164,12 @@ class Park_con(Node):
         if self.turned_on is False:
             return
         # self.get_logger().info('Received message laser')
+        close_values = []
         taken = False
         self.right_distance = msg.right_distance
         # self.get_logger().info(f"{msg.right_distance}")
         ranges = msg.raw
+        right_sector = []
         right_sector = ranges[536:544]
 
         # Filter: Werte unter 0.2 und ungleich 0.0
@@ -169,13 +177,14 @@ class Park_con(Node):
 
         if len(close_values) > 0:
             self.sign_detected = True
+            self.get_logger().info("Hallo in sign_detect right")
 
         # 70 110, 63 123, 58 138
         i = 0
         far_dist = 0.37
         middle_dist = 0.3
         close_dist = 0.22
-        corner_dist = 0.41
+        corner_dist = 0.39
         far_start_angle = 720 - 146
         middle_start_angle = 720 - 124
         close_start_angle = 720 - 114
@@ -217,6 +226,8 @@ class Park_con(Node):
                 self.front_spot = "taken"
             if self.driveby == 3:
                 self.left_spot = "taken"
+            if self.driveby == 4:
+                self.last_spot = "taken"
         self.scanning = False
         # self.get_logger().info("End of Laserscan in Park")
 
@@ -229,14 +240,10 @@ class Park_con(Node):
         self.wait_ros2(1)  # wait next to Parksign for testing
         # self.last_spin = True
 
-        # self.laneholding_for_duration(5.0, 0.1, 1.0)  # drive unitl middle of first spot
-        self.drive_length_odom(0.433)
+        self.drive_length_odom(0.42)  # drive unitl middle of first spot
         self.publisher_driver.publish(self.stopmsg)  # Stop for testing
         self.get_logger().info("Stopping at first spot")
         # self.wait_ros2(3)
-
-        # self.laneholding_for_duration(4.0, 0.1, 1.0)
-        # self.publisher_driver.publish(self.stopmsg)
 
         self.driveby = 1  # at first spot
         self.scanning = True  # start scanning
@@ -295,7 +302,26 @@ class Park_con(Node):
             self.wait_ros2(5)
             self.depark("backwards")
             return
-
+        '''
+        self.drive_length(self.parkinglength)
+        self.publisher_driver.publish(self.stopmsg)
+        self.driveby = 4  # drive along third spot
+        self.scanning = True
+        self.wait_ros2(1)
+        if self.last_spot == "empty":
+            # takeleft parkingspot
+            # self.turn90(-1.0)
+            # self.turn90(-1.0)
+            self.get_logger().info("In letzter (4) Lücke parken")
+            # self.laneholding_for_duration(2.0, 0.1, -1.0)
+            # self.drive_length(1.2, -1.0)
+            self.turn90(-1.0)
+            self.drive_length(self.parkingdist)
+            self.get_logger().info("Warten in Lücke für 5 Sekunden")
+            self.wait_ros2(5)
+            self.depark("backwards")
+            return
+        '''
     def depark(self, direction):
         if direction == "forwards":
             self.turn90(1.0)
@@ -440,12 +466,13 @@ class Park_con(Node):
             msg = self.followmsg
             self.publisher_driver.publish(msg)
             self.wait_ros2(interval_sec)
+            self.get_logger().info("Waiting for sign to the right")
 
-    def wait_ros2(self, duration):
-        """ROS 2-kompatibles Warten, ohne Callbacks zu blockieren."""
-        start_time = self.get_clock().now().nanoseconds
-        while (self.get_clock().now().nanoseconds - start_time) / 1e9 < duration:
-            rclpy.spin_once(self, timeout_sec=0.1)
+    def wait_ros2(self, duration: float):
+        i = duration * 100
+        while i > 0:
+            time.sleep(0.01)
+            i -= 1
 
 
 def main(args=None):

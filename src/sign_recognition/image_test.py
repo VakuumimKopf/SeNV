@@ -2,7 +2,7 @@ from ultralytics import YOLO
 
 
 # Modell laden
-model = YOLO("src/sign_recognition/best.pt")  # z. B. "./yolo_model/best.pt"
+model = YOLO("src/senv/senv/best3.0.pt")  # z. B. "./yolo_model/best.pt"
 
 # Bildpfad (ersetzen durch dein Bild)
 img_path = "src/sign_recognition/test.jpg"
